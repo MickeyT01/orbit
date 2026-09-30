@@ -324,6 +324,12 @@ input,textarea,select{font:inherit;color:inherit}
 .node.loose .float{animation:drift 9s ease-in-out infinite alternate;animation-delay:var(--d,0s)}
 @keyframes drift{0%{transform:translate(-5px,-6px)}50%{transform:translate(6px,2px)}100%{transform:translate(-2px,7px)}}
 .grow-row .pc{width:auto;min-width:34px}
+.node{touch-action:none}
+.node.dragging{transition:none!important;z-index:20;cursor:grabbing}
+.node.dragging .body{box-shadow:0 20px 50px -10px rgba(0,0,0,.7);opacity:.92}
+.node.dragging .float{animation:none}
+.is-dragging .link{opacity:.25}
+.node.drop-ok .body{box-shadow:0 0 0 3px var(--blue-2),0 0 40px -4px var(--blue-2)!important;transform:scale(1.1)}
 
 /* ============ TOAST / AUTH / MOBILE NAV ============ */
 .toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom));transform:translate(-50%,20px);opacity:0;pointer-events:none;
@@ -426,7 +432,7 @@ input,textarea,select{font:inherit;color:inherit}
           <svg id="links"></svg>
           <div id="nodes"></div>
           <div class="legend"><span><i class="sw s1"></i>Goal</span><span><i class="sw s2"></i>Sub-goal</span><span><i class="sw s3"></i>Deeper</span><span><i class="sw s4"></i>Task</span></div>
-          <div class="hint">Tap a goal to go deeper. Tap a task bubble to check it off, right-click it for details. Esc goes back up.</div>
+          <div class="hint">Tap a goal to go deeper. Drag a bubble onto another goal to move it. Tap a task to check it off. Esc goes back up.</div>
         </div>
       </div>
       <aside class="gpanel" id="gpanel"></aside>
@@ -576,6 +582,26 @@ function setSync(state, msg) {
   el.title = msg || (state === 'local' ? 'Data is stored in this browser' : '');
 }
 
+/* ---------------- root bubble profile (name + note) ---------------- */
+const PROFILE = { title: 'Your life', note: '' };
+const rootName = () => (PROFILE.title || '').trim() || 'Your life';
+function loadProfile() {
+  let d = null;
+  if (Store.live && Store.user) { const md = Store.user.user_metadata || {}; d = { title: md.orbit_title, note: md.orbit_note }; }
+  else { try { d = JSON.parse(localStorage.getItem('orbit.profile') || 'null'); } catch (e) {} }
+  if (d) { if (d.title) PROFILE.title = d.title; if (d.note) PROFILE.note = d.note; }
+}
+let profileTimer;
+function saveProfile() {
+  clearTimeout(profileTimer);
+  profileTimer = setTimeout(async () => {
+    if (!Store.live) { try { localStorage.setItem('orbit.profile', JSON.stringify(PROFILE)); } catch (e) {} return; }
+    setSync('saving');
+    const r = await Store.sb.auth.updateUser({ data: { orbit_title: PROFILE.title, orbit_note: PROFILE.note } });
+    setSync(r.error ? 'error' : 'ok', r.error && r.error.message);
+  }, 600);
+}
+
 /* ---------------- model helpers ---------------- */
 const G = id => S.goals.find(g => g.id === id);
 const T = id => S.tasks.find(t => t.id === id);
@@ -646,6 +672,42 @@ function addTree(parentId, node) {
     (n.children || []).forEach(ch => walk(g.id, ch));
   })(parentId, node);
   return c;
+}
+function subtreeHeight(id) { const k = kidsOf(id); return 1 + (k.length ? Math.max.apply(null, k.map(c => subtreeHeight(c.id))) : 0); }
+function canMoveGoal(id, np) {
+  if (np === id) return false;
+  if (np && descIds(id).indexOf(np) > -1) return false;
+  return (np ? G(np).tier : 0) + subtreeHeight(id) <= MAX_DEPTH;
+}
+function moveGoal(id, np, silent) {
+  np = np || null; const g = G(id); if (!g) return false;
+  const old = g.parent_id || null; if (old === np) return true;
+  if (!canMoveGoal(id, np)) { toast(np && descIds(id).indexOf(np) > -1 ? 'A goal cannot go inside its own sub-goal' : 'That would go deeper than 6 levels'); return false; }
+  const sibs = kidsOf(np);
+  g.parent_id = np; g.sort = (sibs.length ? Math.max.apply(null, sibs.map(x => x.sort || 0)) : 0) + 1;
+  if (!np && !g.color) g.color = nextColor();
+  (function fix(gid, tier) { const x = G(gid); x.tier = tier; Store.save('goals', x); kidsOf(gid).forEach(c => fix(c.id, tier + 1)); })(id, np ? G(np).tier + 1 : 1);
+  if (!silent) toast('Moved "' + g.title + '" into ' + (np ? '"' + G(np).title + '"' : rootName()), () => { moveGoal(id, old, true); render(); });
+  return true;
+}
+function reorderGoal(id, dir) {
+  const g = G(id), sibs = kidsOf(g.parent_id), i = sibs.findIndex(x => x.id === id), j = i + dir;
+  if (j < 0 || j >= sibs.length) return;
+  sibs.forEach((x, k) => { x.sort = k + 1; });
+  const o = sibs[j]; const t = g.sort; g.sort = o.sort; o.sort = t;
+  sibs.forEach(x => Store.save('goals', x));
+}
+function moveOptions(g) {
+  let h = '<option value="__root"' + (g.parent_id ? '' : ' selected') + '>' + esc(rootName()) + ' (top level)</option>';
+  (function walk(pid, depth) {
+    kidsOf(pid).forEach(x => {
+      if (x.id === g.id) return;
+      const ok = canMoveGoal(g.id, x.id);
+      h += '<option value="' + x.id + '"' + (g.parent_id === x.id ? ' selected' : '') + (ok ? '' : ' disabled') + '>' + '\u00a0\u00a0\u00a0'.repeat(depth + 1) + esc(x.title) + '</option>';
+      walk(x.id, depth + 1);
+    });
+  })(null, 0);
+  return h;
 }
 function updateGoal(g, patch, delay) { Object.assign(g, patch); Store.save('goals', g, delay); }
 function deleteGoal(id) {
@@ -755,7 +817,7 @@ function renderBnav() {
 
 /* ---------------- goals: crumbs ---------------- */
 function renderCrumbs() {
-  let h = '<button data-act="focus" data-id="" class="' + (UI.focus ? '' : 'cur') + '">Your life</button>';
+  let h = '<button data-act="focus" data-id="" class="' + (UI.focus ? '' : 'cur') + '">' + esc(rootName()) + '</button>';
   if (UI.focus) pathOf(UI.focus).forEach((g, i, a) => { h += icon('right', 'sm') + '<button data-act="focus" data-id="' + g.id + '" class="' + (i === a.length - 1 ? 'cur' : '') + '">' + esc(g.title) + '</button>'; });
   $('#crumbs').innerHTML = h;
 }
@@ -833,9 +895,9 @@ function nodeInfo(it) {
   let cls = it.kind, inner = '', ring = '', sats = '', ext = '', label = '', act = '';
   if (it.kind === 'root') {
     const n = kidsOf(null).length, ms = measured(null);
-    label = 'Your life' + (ms ? ', ' + pct(null) + '% overall' : '');
-    if (role === 'center') { ring = ringSVG(ms ? prog(null) : 0); inner = '<span class="lbl">' + n + ' goal' + (n === 1 ? '' : 's') + '</span><span class="ttl">Your life</span>' + (ms ? '<span class="pct">' + pct(null) + '%</span>' : ''); act = 'centerTap'; }
-    else { inner = icon('up'); ext = 'Your life'; act = 'focus'; label = 'Back to your life'; }
+    label = rootName() + (ms ? ', ' + pct(null) + '% overall' : '');
+    if (role === 'center') { ring = ringSVG(ms ? prog(null) : 0); inner = '<span class="lbl">' + n + ' goal' + (n === 1 ? '' : 's') + '</span><span class="ttl">' + esc(rootName()) + '</span>' + (ms ? '<span class="pct">' + pct(null) + '%</span>' : ''); act = 'centerTap'; }
+    else { inner = icon('up'); ext = rootName(); act = 'focus'; label = 'Back to ' + rootName(); }
   } else if (it.kind === 'goal') {
     const g = G(it.id), mz = measure(g.id), ms = mz.p !== null;
     cls += ' t' + Math.min(g.tier, 3) + (g.done ? ' achieved' : '');
@@ -858,7 +920,9 @@ function nodeInfo(it) {
   } else if (it.kind === 'more') { inner = '<span class="ttl mono">+' + it.n + '</span>'; label = it.n + ' more tasks'; act = UI.focus ? 'moreTasks' : 'moreRoot'; }
   cls += ' ' + role;
   const html = '<span class="float">' + ring + sats + '<span class="body">' + inner + '</span></span>' + (ext ? '<span class="ext">' + esc(ext) + '</span>' : '');
-  return { cls: cls, html: html, label: label, act: act };
+  let tip = '';
+  if (it.kind === 'goal') tip = G(it.id).title; else if (it.kind === 'task') tip = T(it.id).title + '\nClick to check off, right-click for details, drag onto a goal to move';
+  return { cls: cls, html: html, label: label, act: act, tip: tip };
 }
 function place(el, x, y, r) { el.style.width = el.style.height = (2 * r).toFixed(1) + 'px'; el.style.transform = 'translate(' + (x - r).toFixed(1) + 'px,' + (y - r).toFixed(1) + 'px)'; }
 function renderStage() {
@@ -885,7 +949,7 @@ function renderStage() {
     el.style.setProperty('--h', it.hue);
     el.style.setProperty('--d', (-(hash(it.key) % 6000) / 1000) + 's');
     el.dataset.act = info.act; el.dataset.id = it.id || ''; el.dataset.key = it.key;
-    el.setAttribute('aria-label', info.label);
+    el.setAttribute('aria-label', info.label); el.title = info.tip || '';
     if (el._html !== info.html) { el.innerHTML = info.html; el._html = info.html; }
     place(el, it.x, it.y, it.r); el.style.opacity = '1';
   });
@@ -915,7 +979,7 @@ function renderStage() {
   let empty = $('#emptyCta');
   if (!UI.focus && !kidsOf(null).length && !S.tasks.some(t => !t.goal_id && !t.done)) {
     if (!empty) { empty = document.createElement('div'); empty.id = 'emptyCta'; empty.className = 'empty-cta'; stage.appendChild(empty); }
-    empty.innerHTML = '<div><b style="color:var(--text)">What do you want most?</b><br>Add a goal, then break it into sub-goals and tasks.</div><div class="row"><button class="btn" data-act="compose">' + icon('plus', 'sm') + 'Add a goal</button><button class="btn ghost" data-act="seed">Load an example</button></div>';
+    empty.innerHTML = '<div><b style="color:var(--text)">What do you want most?</b><br>Add a goal, then break it into sub-goals and tasks. Pick from ideas or type your own.</div><div class="row"><button class="btn" data-act="compose">' + icon('plus', 'sm') + 'Add a goal</button></div>';
   } else if (empty) empty.remove();
   positionComposer();
 }
@@ -974,16 +1038,19 @@ function renderPanel() {
   const hue = g ? hueOf(g) : HUES.blue;
   const mz = measure(f), p = pct(f), ms = mz.p !== null;
   const peekVal = g && g.done ? 'Achieved' : g && mz.how === 'metric' ? metricText(g) : ms ? p + '%' : '';
-  let h = '<button class="peek" data-act="sheet"><span class="hdot" style="--h:' + hue + '"></span><span class="t">' + esc(g ? g.title : 'Your life') + '</span><span class="p">' + esc(peekVal) + '</span>' + icon('up') + '</button><div class="pp" style="--h:' + hue + '">';
+  let h = '<button class="peek" data-act="sheet"><span class="hdot" style="--h:' + hue + '"></span><span class="t">' + esc(g ? g.title : rootName()) + '</span><span class="p">' + esc(peekVal) + '</span>' + icon('up') + '</button><div class="pp" style="--h:' + hue + '">';
   if (!g) {
     const vs = kidsOf(null), bt = branchTasks(null), floating = S.tasks.filter(t => !t.goal_id && !t.done).length;
-    h += '<div class="ptier"><b>Overview</b></div><div style="font-size:22px;font-weight:700">Your life</div>' +
+    h += '<div class="ptier"><b>Main bubble</b><span>tap the name to rename it</span></div>' +
+      '<textarea class="ptitle" rows="1" data-rootfield="title" aria-label="Main bubble name">' + esc(rootName()) + '</textarea>' +
+      '<div class="card"><div class="frow">' + icon('note') + '<div class="grow"><textarea rows="2" data-rootfield="note" placeholder="What this is all for">' + esc(PROFILE.note) + '</textarea></div></div></div>' +
       (ms ? '<div><div class="pbar"><i style="width:' + p + '%"></i></div><div class="pstat"><span>' + p + '% overall</span><span>' + bt.filter(t => t.done).length + '/' + bt.length + ' goal tasks done</span></div></div>' : '') +
       '<section><div class="sec-h">Goals <span class="n">' + vs.length + '</span></div>' + vs.map(goalRowHTML).join('') +
       '<label class="addrow">' + icon('plus') + '<input data-add="goal" placeholder="Add a goal" autocomplete="off"></label></section>' +
       '<button class="btn ghost" data-act="openAdd" data-t="goal">' + icon('sparkle', 'sm') + 'Browse goal ideas</button>' +
       (floating ? '<button class="grow-row" data-act="view" data-v="all"><i class="hdot" style="--h:#8b98a9"></i><span class="t">' + floating + ' unassigned task' + (floating === 1 ? '' : 's') + ' floating on the map</span>' + icon('right', 'sm muted') + '</button>' : '') +
-      '<p class="small muted">How progress works: a goal\'s percent is the average of what is inside it. Sub-goals count by their own percent, tasks count once checked off (steps give partial credit), and repeating tasks are left out because they are habits. A goal with nothing inside yet shows no percent. For goals like saving money or reading books, switch it to track a number instead.</p>';
+      '<p class="small muted">How progress works: a goal\'s percent is the average of what is inside it. Sub-goals count by their own percent, tasks count once checked off (steps give partial credit), and repeating tasks are left out because they are habits. A goal with nothing inside yet shows no percent. For goals like saving money or reading books, switch it to track a number instead.</p>' +
+      '<button class="btn danger" data-act="startFresh">' + icon('trash', 'sm') + 'Start fresh (delete everything)</button>';
   } else {
     const kids = kidsOf(g.id), ts = tasksOf(g.id).sort((a, b) => (a.done - b.done) || ((b.sort || 0) - (a.sort || 0)));
     const parent = g.parent_id ? G(g.parent_id) : null, isNum = +g.metric_target > 0;
@@ -999,6 +1066,8 @@ function renderPanel() {
       '<div class="frow">' + icon('cal') + '<span class="grow">Target date</span><input type="date" data-gfield="target_date" value="' + (g.target_date || '') + '"></div>' +
       (g.tier === 1 ? '<div class="frow">' + icon('target') + '<span class="grow">Color</span><span class="swatches">' + HUE_KEYS.map(k => '<button class="swatch ' + (g.color === k ? 'on' : '') + '" style="--h:' + HUES[k] + '" data-act="color" data-c="' + k + '" aria-label="' + k + '"></button>').join('') + '</span></div>' : '') +
       '<div class="frow">' + icon('sort') + '<span class="grow">Measure by</span><select class="sel" data-gfield="measure"><option value="rollup"' + (isNum ? '' : ' selected') + '>What is inside it</option><option value="number"' + (isNum ? ' selected' : '') + '>A number</option></select></div>' +
+      '<div class="frow">' + icon('layers') + '<span class="grow">Inside of</span><select class="sel" data-gfield="move" style="max-width:62%">' + moveOptions(g) + '</select></div>' +
+      '<div class="frow">' + icon('sort') + '<span class="grow">Order</span><button class="iconbtn" data-act="reorder" data-n="-1" aria-label="Move earlier">' + icon('back') + '</button><button class="iconbtn" data-act="reorder" data-n="1" aria-label="Move later">' + icon('right') + '</button></div>' +
       (isNum ? '<div class="frow metric"><button class="iconbtn" data-act="metricStep" data-n="-1" aria-label="Decrease">-</button><input type="number" min="0" step="any" data-gfield="metric_current" value="' + (+g.metric_current || 0) + '" aria-label="Current"><span>of</span><input type="number" min="0" step="any" data-gfield="metric_target" value="' + (+g.metric_target) + '" aria-label="Target"><input type="text" class="unit" data-gfield="metric_unit" placeholder="unit" value="' + esc(g.metric_unit || '') + '" aria-label="Unit"><button class="iconbtn" data-act="metricStep" data-n="1" aria-label="Increase">+</button></div>' : '') +
       '</div>' +
       '<button class="btn ' + (g.done ? 'good' : 'ghost') + '" data-act="achieve">' + icon('check', 'sm') + (g.done ? 'Achieved' : 'Mark achieved') + '</button>';
@@ -1582,6 +1651,19 @@ const LIB = (function parse(txt) {
 })(LIB_TEXT);
 const GENERIC_GOALS = ['Define what done looks like', 'Learn what it takes', 'Build the weekly habit', 'Remove the biggest obstacle', 'Find a mentor or community', 'Hit a first small win'];
 const GENERIC_TASKS = ['Write down why this matters', 'Research the first step', 'Block time on my calendar', 'Tell someone for accountability', 'Review progress on Sunday', 'Set a target date'];
+const LIBTASKS = [];
+Object.keys(LIBMAP).forEach(k => LIBMAP[k].children.forEach(c => { if (c.type === 'task') LIBTASKS.push({ type: 'task', title: c.title, children: [], words: new Set(toks(c.title)), from: LIBMAP[k].title }); }));
+function libSearch(q, want) {
+  const ql = q.toLowerCase().trim(), qt = toks(q); if (ql.length < 2) return [];
+  const pool = want === 'task' ? LIBTASKS : Object.keys(LIBMAP).map(k => LIBMAP[k]);
+  const out = [];
+  pool.forEach(n => {
+    let sc = n.title.toLowerCase().indexOf(ql) > -1 ? 3 : 0;
+    qt.forEach(w => { if (n.words.has(w)) sc += 1; else { for (const x of n.words) { if (x.indexOf(w) === 0) { sc += 0.6; break; } } } });
+    if (sc > 0) out.push({ n: n, sc: sc });
+  });
+  return out.sort((a, b) => b.sc - a.sc || a.n.title.length - b.n.title.length).slice(0, 8).map(x => x.n);
+}
 function libNodeFor(g) {
   if (g.template_key && LIBMAP[g.template_key]) return LIBMAP[g.template_key];
   const gt = new Set(toks(g.title)); if (!gt.size) return null;
@@ -1602,7 +1684,7 @@ function openAdd(parentId, type) {
   const g = parentId ? G(parentId) : null, canGoal = !g || g.tier < MAX_DEPTH;
   let t = type;
   if (!t && g) { const n = libNodeFor(g); if (n && n.children.length && n.children.every(c => c.type === 'task')) t = 'task'; }
-  UI.add = { parent: parentId || null, type: canGoal ? (t || 'goal') : 'task', cat: LIB[0].name, ai: null, list: [] };
+  UI.add = { parent: parentId || null, type: canGoal ? (t || 'goal') : 'task', cat: LIB[0].name, ai: null, list: [], q: '' };
   renderAddSheet();
   setTimeout(() => { const i = $('#addSheetInput'); if (i && window.innerWidth > 860) i.focus(); }, 60);
 }
@@ -1611,6 +1693,10 @@ function suggestionsFor(a) {
   const g = a.parent ? G(a.parent) : null;
   const have = new Set((g ? kidsOf(g.id).map(k => k.title).concat(tasksOf(g.id).map(t => t.title)) : kidsOf(null).map(k => k.title)).map(x => x.toLowerCase()));
   const fresh = arr => arr.filter(n => !have.has(n.title.toLowerCase()));
+  if (a.q && a.q.trim().length >= 2 && !(!g && a.type === 'task')) {
+    const hits = fresh(libSearch(a.q, a.type === 'task' ? 'task' : 'goal'));
+    if (hits.length) return { label: 'Matching ideas', items: hits, searching: true };
+  }
   if (!g) {
     if (a.type === 'task') return { label: '', items: [] };
     const cat = LIB.find(c => c.name === a.cat) || LIB[0];
@@ -1640,12 +1726,12 @@ function renderAddSheet() {
   const g = a.parent ? G(a.parent) : null, canGoal = !g || g.tier < MAX_DEPTH, hue = g ? hueOf(g) : HUES.blue;
   const old = $('#addSheetInput'), prevVal = old ? old.value : '', hadFocus = document.activeElement === old;
   const sg = suggestionsFor(a); a.list = sg.items.slice();
-  const where = g ? pathOf(g.id).map(x => esc(x.title)).join(' / ') : 'Your life';
+  const where = g ? pathOf(g.id).map(x => esc(x.title)).join(' / ') : esc(rootName());
   let h = '<div class="as-head"><div class="where"><div class="small muted">Add to</div><div class="as-path"><i class="hdot" style="--h:' + hue + '"></i><span>' + where + '</span></div></div><button class="iconbtn" data-act="closeAdd" aria-label="Close">' + icon('x') + '</button></div>';
   h += '<div class="seg"><button data-act="addType" data-t="goal" class="' + (a.type === 'goal' ? 'on' : '') + '"' + (canGoal ? '' : ' disabled title="Goals go 6 levels deep"') + '>' + (g ? 'Sub-goal' : 'Goal') + '</button><button data-act="addType" data-t="task" class="' + (a.type === 'task' ? 'on' : '') + '">Task</button></div>';
   const ph = a.type === 'task' ? (g ? 'New task' : 'New task (floats until you link it to a goal)') : (g ? 'Name the sub-goal' : 'Name your goal');
   h += '<div class="as-input"><input id="addSheetInput" autocomplete="off" placeholder="' + esc(ph) + '"><button class="btn" data-act="addSheetSubmit">Add</button></div><div class="as-body">';
-  if (!g && a.type === 'goal') h += '<div class="cats">' + LIB.map(c => '<button data-act="addCat" data-c="' + esc(c.name) + '" class="' + (c.name === a.cat ? 'on' : '') + '">' + esc(c.name) + '</button>').join('') + '</div>';
+  if (!g && a.type === 'goal' && !sg.searching) h += '<div class="cats">' + LIB.map(c => '<button data-act="addCat" data-c="' + esc(c.name) + '" class="' + (c.name === a.cat ? 'on' : '') + '">' + esc(c.name) + '</button>').join('') + '</div>';
   if (sg.label && a.list.length) h += '<div class="as-label">' + esc(sg.label) + '</div>';
   h += a.list.map((n, i) => sugRow(n, i, 'lib', hue)).join('');
   if (!g && a.type === 'task') h += '<p class="small muted" style="padding:4px 2px">Tasks added here float on the main map and show up in your Tasks list. Link one to a goal any time from its details and its bubble moves inside that goal.</p>';
@@ -1668,13 +1754,14 @@ function addSuggestion(src, i, plan) {
   else if (plan) { const c = addTree(a.parent, n); toast('Added "' + n.title + '" with ' + Math.max(0, c.goals - 1) + ' sub-goals and ' + c.tasks + ' tasks'); }
   else { addTree(a.parent, Object.assign({}, n, { children: [] })); toast('Added "' + n.title + '"'); }
   if (src === 'ai') a.ai.items.splice(i, 1);
+  a.q = ''; const inp = $('#addSheetInput'); if (inp) inp.value = '';
   render(); renderAddSheet();
 }
 function addSheetSubmit() {
   const a = UI.add, inp = $('#addSheetInput'); if (!a || !inp) return;
   const v = inp.value.trim(); if (!v) return;
   if (a.type === 'task') addTask({ goal_id: a.parent, title: v }); else addGoal(a.parent, v);
-  inp.value = ''; render(); renderAddSheet(); $('#addSheetInput').focus();
+  inp.value = ''; a.q = ''; render(); renderAddSheet(); $('#addSheetInput').focus();
 }
 async function aiSuggest() {
   const a = UI.add; if (!a) return;
@@ -1701,6 +1788,7 @@ function closeSide() { $('#side').classList.remove('open'); $('#sideScrim').clas
 function setView(v) { UI.view = v; UI.q = ''; $('#search').value = ''; UI.renaming = false; UI.openTask = null; closeSide(); render(); }
 
 document.addEventListener('click', e => {
+  if (justDragged) { justDragged = false; e.preventDefault(); return; }
   const a = e.target.closest('[data-act]'); if (!a) return;
   const act = a.dataset.act, id = a.dataset.id;
   if (a.tagName === 'LABEL' || a.tagName === 'SELECT') return;
@@ -1723,6 +1811,8 @@ document.addEventListener('click', e => {
     case 'addSug': addSuggestion(a.dataset.src, +a.dataset.i, a.dataset.plan === '1'); break;
     case 'aiSuggest': aiSuggest(); break;
     case 'moreRoot': setView('all'); break;
+    case 'reorder': reorderGoal(UI.focus, +a.dataset.n); render(); break;
+    case 'startFresh': startFresh(); break;
     case 'metricStep': {
       const g = G(UI.focus); const v = Math.max(0, (+g.metric_current || 0) + (+a.dataset.n));
       updateGoal(g, { metric_current: v }); render();
@@ -1785,7 +1875,12 @@ document.addEventListener('mouseover', e => {
 });
 document.addEventListener('input', e => {
   const el = e.target;
+  if (el.id === 'addSheetInput' && UI.add) { const pos = el.selectionStart; UI.add.q = el.value; renderAddSheet(); const i = $('#addSheetInput'); i.focus(); i.setSelectionRange(pos, pos); return; }
   if (el.id === 'search') { UI.q = el.value.trim(); if (UI.q && UI.view === 'goals') UI.view = 'all'; UI.openTask = null; render(); $('#search').focus(); return; }
+  if (el.dataset.rootfield) {
+    if (el.dataset.rootfield === 'title') { autosize(el); PROFILE.title = el.value; renderLight(); } else PROFILE.note = el.value;
+    saveProfile(); return;
+  }
   if (el.dataset.gfield) {
     const g = G(UI.focus); const f = el.dataset.gfield;
     if (f === 'title') { autosize(el); updateGoal(g, { title: el.value }, 500); renderLight(); }
@@ -1802,6 +1897,7 @@ document.addEventListener('change', e => {
   const el = e.target;
   if (el.id === 'importFile') { if (el.files[0]) importData(el.files[0]); el.value = ''; return; }
   if (el.dataset.gfield === 'target_date') { updateGoal(G(UI.focus), { target_date: el.value || null }); return; }
+  if (el.dataset.gfield === 'move') { moveGoal(UI.focus, el.value === '__root' ? null : el.value); render(); return; }
   if (el.dataset.gfield === 'measure') {
     const g = G(UI.focus);
     if (el.value === 'number') updateGoal(g, { metric_target: +g.metric_target > 0 ? g.metric_target : 10, metric_current: +g.metric_current || 0 });
@@ -1869,6 +1965,53 @@ document.addEventListener('focusout', e => {
 });
 new ResizeObserver(() => { if (UI.view === 'goals') renderStage(); }).observe($('#stage'));
 
+/* Drag a goal or task bubble onto another goal (or the back bubble) to move it. */
+let drag = null, justDragged = false;
+function dropTargetAt(x, y, d) {
+  const els = document.elementsFromPoint(x, y);
+  for (const el of els) {
+    const n = el.closest && el.closest('.node');
+    if (!n || n === d.el || n.classList.contains('leaving')) continue;
+    const k = n.dataset.key;
+    if (k === 'root') return { id: null, el: n };
+    const g = G(k); if (g) return { id: g.id, el: n };
+  }
+  return null;
+}
+$('#stage').addEventListener('pointerdown', e => {
+  if (e.button !== 0) return;
+  const n = e.target.closest('.node.orbit'); if (!n) return;
+  const kind = n.dataset.act === 'focus' ? 'goal' : n.dataset.act === 'bubbleTask' ? 'task' : null; if (!kind) return;
+  drag = { el: n, kind: kind, id: n.dataset.id, sx: e.clientX, sy: e.clientY, moved: false };
+});
+window.addEventListener('pointermove', e => {
+  if (!drag) return;
+  const dx = e.clientX - drag.sx, dy = e.clientY - drag.sy;
+  if (!drag.moved) { if (Math.hypot(dx, dy) < 8) return; drag.moved = true; drag.base = drag.el.style.transform; drag.el.classList.add('dragging'); $('#stage').classList.add('is-dragging'); }
+  drag.el.style.transform = drag.base + ' translate(' + dx + 'px,' + dy + 'px)';
+  $$('.node.drop-ok').forEach(x => x.classList.remove('drop-ok'));
+  const t = dropTargetAt(e.clientX, e.clientY, drag);
+  if (t && (drag.kind === 'task' || t.id === null || canMoveGoal(drag.id, t.id))) t.el.classList.add('drop-ok');
+});
+window.addEventListener('pointerup', e => {
+  if (!drag) return; const d = drag; drag = null;
+  if (!d.moved) return;
+  justDragged = true; setTimeout(() => { justDragged = false; }, 80);
+  d.el.classList.remove('dragging'); $('#stage').classList.remove('is-dragging');
+  $$('.node.drop-ok').forEach(x => x.classList.remove('drop-ok'));
+  const t = dropTargetAt(e.clientX, e.clientY, d);
+  const here = UI.focus || null;
+  if (t && t.id !== here) {
+    if (d.kind === 'task') {
+      const task = T(d.id), old = task.goal_id || null;
+      updateTask(task, { goal_id: t.id });
+      toast('Moved "' + task.title + '" into ' + (t.id ? '"' + G(t.id).title + '"' : rootName()), () => { updateTask(task, { goal_id: old }); render(); });
+    } else moveGoal(d.id, t.id);
+  }
+  render();
+});
+window.addEventListener('pointercancel', () => { if (drag && drag.moved) { drag.el.classList.remove('dragging'); $('#stage').classList.remove('is-dragging'); render(); } drag = null; });
+
 /* =====================================================================
    EXAMPLE DATA
    ===================================================================== */
@@ -1904,7 +2047,7 @@ function seedExample() {
 /* =====================================================================
    BOOT (auto-detect preview vs live GitHub Pages)
    ===================================================================== */
-function startApp() { hydrateIcons(document); render(); }
+function startApp() { hydrateIcons(document); loadProfile(); render(); }
 let started = false;
 async function startLive() {
   $('#auth').classList.remove('on'); $('#logoutBtn').hidden = false; setSync('saving');
@@ -1961,6 +2104,16 @@ async function importData(file) {
   merge(S.tasks, d.tasks.map(t => Object.assign({ steps: [] }, t)), 'tasks');
   Store.persistLocal(); render(); toast('Backup restored');
 }
+function startFresh() {
+  const n = S.goals.length + S.tasks.length + S.lists.length;
+  if (!n) { toast('Already empty'); return; }
+  if (!confirm('Delete every goal, task and list (' + S.goals.length + ' goals, ' + S.tasks.length + ' tasks)?\n\nA backup file downloads first, so you can restore it with the upload button if you change your mind.')) return;
+  exportData();
+  S = { goals: [], lists: [], tasks: [] }; UI.focus = null; UI.openTask = null;
+  if (Store.live) ['tasks', 'lists', 'goals'].forEach(tb => Store.enqueue(() => Store.sb.from(tb).delete().not('id', 'is', null)));
+  else Store.persistLocal();
+  setView('goals'); setTimeout(() => toast('Fresh start. Your backup file downloaded.'), 300);
+}
 async function sendReset() {
   const email = $('#authEmail').value.trim();
   if (!email) { authMsg('Enter your email first, then tap Forgot password.'); return; }
@@ -1984,7 +2137,6 @@ async function sendReset() {
     else showAuth();
   } else {
     const had = Store.loadLocal();
-    if (!had) seedExample();
     Store.persistLocal(); setSync('local'); startApp();
   }
 })();
