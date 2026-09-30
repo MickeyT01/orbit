@@ -118,11 +118,11 @@ input,textarea,select{font:inherit;color:inherit}
 .node:hover .body{transform:scale(1.07)}
 .node.center:hover .body{transform:scale(1.02)}
 .node:active .body{transform:scale(.97)}
-.ttl{font-weight:600;line-height:1.16;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;font-size:12.5px;transition:font-size var(--t-orbit) var(--ease);word-break:break-word}
-.center .ttl{font-size:17px;font-weight:700;-webkit-line-clamp:3}
-.lbl{font-size:10.5px;font-weight:600;color:rgba(255,255,255,.7);letter-spacing:.02em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
-.pct{font:700 11px var(--mono);opacity:.8}
-.center .pct{font-size:13px}
+.ttl{font-weight:600;line-height:1.2;display:block;overflow:hidden;font-size:12.5px;transition:font-size var(--t-orbit) var(--ease);overflow-wrap:anywhere;max-width:100%}
+.center .ttl{font-size:17px;font-weight:700}
+.lbl{font-size:calc(10.5px * var(--sc,1));font-weight:600;color:rgba(255,255,255,.7);letter-spacing:.02em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.pct{font:700 calc(11px * var(--sc,1)) var(--mono);opacity:.8}
+.center .pct{font-size:calc(13px * var(--sc,1))}
 .ext{position:absolute;top:calc(100% + 6px);left:0;white-space:nowrap;font-size:11.5px;color:var(--muted);pointer-events:none}
 .ring{position:absolute;inset:-6px;width:calc(100% + 12px);height:calc(100% + 12px);transform:rotate(-90deg);pointer-events:none;overflow:visible}
 .ring circle{fill:none;stroke-width:3;vector-effect:non-scaling-stroke}
@@ -142,7 +142,7 @@ input,textarea,select{font:inherit;color:inherit}
 .t2 .body{background:color-mix(in srgb,var(--h) 20%,var(--surface));border:1.5px solid color-mix(in srgb,var(--h) 72%,transparent);box-shadow:0 10px 36px -16px var(--h)}
 .t3 .body{background:var(--surface-2);border:1.5px solid var(--h)}
 .task .body{background:var(--surface);border:1px solid var(--line-2);padding:14%}
-.task .ttl{font-size:10.5px;font-weight:500;-webkit-line-clamp:3}
+.task .ttl{font-size:10.5px;font-weight:500}
 .task .tchk{width:15px;height:15px;border-radius:50%;border:1.5px solid color-mix(in srgb,var(--h) 70%,white 10%);display:grid;place-items:center;flex:none}
 .task.done .body{background:color-mix(in srgb,var(--h) 16%,var(--surface));border-color:color-mix(in srgb,var(--h) 45%,transparent)}
 .task.done .tchk{background:var(--h);border-color:var(--h);color:#fff}
@@ -205,7 +205,7 @@ input,textarea,select{font:inherit;color:inherit}
 .small{font-size:12px}
 
 /* ============ TASKS VIEW ============ */
-#tasksView{grid-template-rows:auto 1fr}
+#tasksView,#settingsView{grid-template-rows:auto 1fr}
 .thead{padding:24px 32px 6px;display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap}
 .thead .tt{flex:1;min-width:220px}
 .thead .h1 input{all:unset;width:100%}
@@ -331,6 +331,76 @@ input,textarea,select{font:inherit;color:inherit}
 .is-dragging .link{opacity:.25}
 .node.drop-ok .body{box-shadow:0 0 0 3px var(--blue-2),0 0 40px -4px var(--blue-2)!important;transform:scale(1.1)}
 
+/* ============ PANEL HIDE, QUICK MENU, DIALOG, SETTINGS, TREE ============ */
+.gpanel{position:relative}
+.panel-x{position:absolute;top:14px;right:12px;z-index:3}
+.ptier{padding-right:34px}
+.panel-fab{position:absolute;top:12px;right:14px;z-index:5;display:none;align-items:center;gap:7px;height:34px;padding:0 14px;border-radius:999px;background:var(--surface-2);border:1px solid var(--line-2);font-size:12.5px;font-weight:600;color:var(--text-2)}
+.panel-fab:hover{color:var(--text)}
+#goalsView.panel-off{grid-template-columns:1fr}
+#goalsView.panel-off .gpanel{display:none}
+#goalsView.panel-off .panel-fab{display:inline-flex}
+.peek .iconbtn{display:none}
+.node,.trow,.grow-row,.gsec-h{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+.ctx-scrim{position:fixed;inset:0;z-index:60;display:none}
+.ctx-scrim.on{display:block}
+.ctx-scrim.on.dim{background:rgba(3,5,8,.5)}
+.ctx{position:fixed;z-index:61;min-width:230px;max-width:300px;max-height:70vh;overflow:auto;background:var(--surface-2);border:1px solid var(--line-2);border-radius:12px;padding:6px;box-shadow:0 24px 60px -12px rgba(0,0,0,.75);display:none}
+.ctx.on{display:block;animation:ctxin .14s var(--ease)}
+.ctx-title{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);padding:4px 8px 8px;border-bottom:1px solid var(--line);margin-bottom:4px;min-width:0}
+.ctx-title span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ctx-item{display:flex;align-items:center;gap:10px;width:100%;padding:9px 10px;border-radius:8px;font-size:13.5px;color:var(--text)}
+.ctx-item:hover:not(:disabled){background:var(--surface-3)}
+.ctx-item.danger{color:var(--danger)}
+.ctx-item:disabled{opacity:.35;cursor:not-allowed}
+.ctx-item.cur{color:var(--blue-2)}
+.ctx-item .hdot{width:8px;height:8px}
+.ctx-item.cancel{justify-content:center;color:var(--text-2);margin-top:4px;border-top:1px solid var(--line);border-radius:0 0 8px 8px}
+.ctx.sheet{left:0!important;right:0;bottom:0;top:auto!important;width:100%;max-width:none;max-height:75vh;border-radius:18px 18px 0 0;padding:10px 10px calc(10px + env(safe-area-inset-bottom));animation:sheetin .22s var(--ease)}
+.ctx.sheet .ctx-item{padding:13px 12px;font-size:15px}
+@keyframes ctxin{from{opacity:0;transform:scale(.96)}}
+@keyframes sheetin{from{transform:translateY(100%)}}
+.dlg{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);width:min(420px,92vw);background:var(--bg-2);border:1px solid var(--line-2);border-radius:16px;padding:20px;z-index:66;display:none;flex-direction:column;gap:12px;box-shadow:0 30px 80px -20px rgba(0,0,0,.8)}
+.dlg.on{display:flex}
+.dlg h3{font-size:18px}
+.dlg input{height:44px;background:var(--surface);border:1px solid var(--line-2);border-radius:10px;padding:0 12px;outline:0;font-family:var(--mono);letter-spacing:.12em}
+.dlg input:focus{border-color:var(--danger)}
+.dlg .row{display:flex;justify-content:flex-end;gap:8px}
+.btn.dangerfill{background:var(--danger);color:#fff}
+.btn.dangerfill:hover{background:#f37573}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.set-card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px 18px;margin:0 0 14px;display:flex;flex-direction:column;gap:10px;max-width:620px}
+.set-card h3{font-size:14.5px}
+.set-card .row{display:flex;gap:8px;flex-wrap:wrap}
+.set-card.danger{border-color:rgba(240,96,93,.3)}
+.set-card input.txt{height:40px;background:var(--surface-2);border:1px solid var(--line-2);border-radius:10px;padding:0 12px;outline:0}
+.set-card input.txt:focus{border-color:var(--blue)}
+.tpath{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-2);margin-top:2px;min-width:0}
+.tpath .hdot{width:7px;height:7px}
+.tpath span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.gsec{margin:6px 0}
+.gsec-h{display:flex;align-items:center;gap:9px;width:100%;padding:8px 8px 8px 10px;border-radius:10px;background:var(--surface);border:1px solid var(--line);border-left:3px solid var(--h);font-weight:600;cursor:pointer}
+.gsec-h:hover{background:var(--surface-2)}
+.gsec-h .chev{transition:transform .2s;color:var(--muted)}
+.gsec-h.closed .chev{transform:rotate(-90deg)}
+.gsec-h .t{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.gsec-h .v{font-size:11px;color:var(--text-2)}
+.gsec-h .n{font-size:11px;color:var(--muted);white-space:nowrap}
+.gsec-h .iconbtn.sm{width:28px;height:28px}
+.gsec-b{padding:6px 0 2px 12px;margin-left:11px;border-left:1px dashed var(--line-2)}
+.addrow.slim{margin:4px 0 8px;padding:6px 10px}
+
+.grip{display:grid;place-items:center;width:22px;height:34px;margin:-6px -4px -6px -6px;color:var(--muted);cursor:grab;touch-action:none;flex:none;opacity:.55;border-radius:6px}
+.grip .ic{width:16px;height:16px}
+.trow:hover .grip{opacity:1}
+.grip:active{cursor:grabbing}
+.trow.rdrag{position:relative;z-index:5;transition:none!important;box-shadow:0 18px 40px -10px rgba(0,0,0,.75);border-color:var(--blue);background:var(--surface-2)}
+.reordering .trow:not(.rdrag){transition:transform .18s var(--ease)}
+.reordering{cursor:grabbing;-webkit-user-select:none;user-select:none}
+.group-h.dl{display:flex;align-items:center;gap:6px;color:var(--warn)}
+.meta.scope .ic{width:12px;height:12px}
+.qchips button.on{border-color:var(--blue);color:var(--text)}
+
 /* ============ TOAST / AUTH / MOBILE NAV ============ */
 .toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom));transform:translate(-50%,20px);opacity:0;pointer-events:none;
   background:var(--surface-3);border:1px solid var(--line-2);border-radius:12px;padding:10px 12px 10px 16px;display:flex;align-items:center;gap:14px;z-index:70;
@@ -370,6 +440,14 @@ input,textarea,select{font:inherit;color:inherit}
   .gpanel{position:absolute;left:0;right:0;bottom:0;max-height:78%;border-left:0;border-top:1px solid var(--line-2);border-radius:20px 20px 0 0;
     transform:translateY(calc(100% - 146px - env(safe-area-inset-bottom)));transition:transform .35s var(--ease);background:rgba(11,15,21,.97)}
   .gpanel.open{transform:none}
+  .panel-x{display:none}
+  .peek .iconbtn{display:grid;width:30px;height:30px;margin-top:6px}
+  #goalsView.panel-off .stage-wrap{padding-bottom:90px}
+  .panel-fab{top:auto;bottom:calc(100px + env(safe-area-inset-bottom));right:14px}
+  .gsec-b{padding-left:8px;margin-left:6px}
+  .tpath{align-items:flex-start}
+  .tpath .hdot{margin-top:5px}
+  .tpath span{white-space:normal}
   .gpanel:not(.open) .pp{visibility:hidden;opacity:0}
   .pp{transition:opacity .25s}
   .peek{display:flex;align-items:center;gap:10px;padding:10px 18px 12px;position:sticky;top:0;background:rgba(11,15,21,.97);z-index:2;width:100%;border-radius:20px 20px 0 0}
@@ -387,12 +465,11 @@ input,textarea,select{font:inherit;color:inherit}
   .bnav button.on{background:linear-gradient(135deg,#2f7df6,#1fb6c8);color:#fff}
   .toast{bottom:calc(92px + env(safe-area-inset-bottom))}
   .step .x{opacity:1}
+  .grip{opacity:.8;width:26px}
   .addsheet{left:0;right:0;top:auto;bottom:0;width:100%;max-height:88vh;transform:translateY(100%);border-radius:18px 18px 0 0;padding-bottom:env(safe-area-inset-bottom)}
   .addsheet.on{transform:none}
-  .center .ttl{font-size:13.5px;-webkit-line-clamp:2}
-  .center .lbl{font-size:9.5px}
+  .center .lbl{font-size:calc(9.5px * var(--sc,1))}
   .task .body{padding:12%;gap:2px}
-  .task .ttl{font-size:9.5px;-webkit-line-clamp:2}
   .task .tchk{width:12px;height:12px}
 }
 @media (prefers-reduced-motion:reduce){
@@ -412,8 +489,7 @@ input,textarea,select{font:inherit;color:inherit}
     <nav class="nav" id="nav"></nav>
     <div class="side-foot"><span class="pill" id="sync"><span class="dot"></span><span id="syncText">Local only</span></span>
       <span style="display:flex;gap:2px">
-        <button class="iconbtn" data-act="exportData" title="Download a backup of all your data"><svg class="ic" data-i="download"></svg></button>
-        <button class="iconbtn" data-act="importData" title="Restore from a backup file"><svg class="ic" data-i="upload"></svg></button>
+        <button class="iconbtn" data-act="view" data-v="settings" title="Settings" aria-label="Settings"><svg class="ic" data-i="gear"></svg></button>
         <button class="iconbtn" id="logoutBtn" data-act="logout" title="Sign out" hidden><svg class="ic" data-i="logout"></svg></button>
       </span>
       <input type="file" id="importFile" accept=".json,application/json" hidden></div>
@@ -429,15 +505,19 @@ input,textarea,select{font:inherit;color:inherit}
           <div class="crumbs" id="crumbs"></div>
         </div>
         <div class="stage" id="stage" tabindex="-1" aria-label="Goal map">
+          <button class="panel-fab" data-act="showPanel"><svg class="ic sm" data-i="panel"></svg>Details</button>
           <svg id="links"></svg>
           <div id="nodes"></div>
           <div class="legend"><span><i class="sw s1"></i>Goal</span><span><i class="sw s2"></i>Sub-goal</span><span><i class="sw s3"></i>Deeper</span><span><i class="sw s4"></i>Task</span></div>
-          <div class="hint">Tap a goal to go deeper. Drag a bubble onto another goal to move it. Tap a task to check it off. Esc goes back up.</div>
         </div>
       </div>
       <aside class="gpanel" id="gpanel"></aside>
     </section>
 
+    <section class="view" id="settingsView">
+      <header class="thead" id="setHead"></header>
+      <div class="tbody"><div class="tcol" id="setBody"></div></div>
+    </section>
     <section class="view" id="tasksView">
       <header class="thead" id="thead"></header>
       <div class="tbody"><div class="tcol" id="tlist"></div></div>
@@ -450,6 +530,10 @@ input,textarea,select{font:inherit;color:inherit}
 <aside class="drawer" id="drawer" aria-label="Task details"></aside>
 <div class="as-scrim" id="addScrim" data-act="closeAdd"></div>
 <div class="addsheet" id="addSheet" role="dialog" aria-label="Add a goal or task"></div>
+<div class="ctx-scrim" id="ctxScrim" data-act="closeCtx"></div>
+<div class="ctx" id="ctx" role="menu"></div>
+<div class="as-scrim" id="dlgScrim" data-act="dlgClose" style="z-index:65"></div>
+<div class="dlg" id="dlg" role="dialog" aria-label="Confirm"></div>
 <div class="toast" id="toast"><span id="toastMsg"></span><button id="toastUndo">Undo</button></div>
 
 <div class="auth" id="auth">
@@ -520,6 +604,11 @@ const IC = {
   download: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/>',
   upload: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/>',
   sparkle: '<path d="M12 3l1.8 4.9L19 9.7l-5.2 1.8L12 16.5l-1.8-5L5 9.7l5.2-1.8z"/><path d="M19 15l.7 1.8 1.8.7-1.8.7L19 20l-.7-1.8-1.8-.7 1.8-.7z"/>',
+  gear: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 0 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 0 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 0 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 0 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>',
+  week: '<rect x="3" y="4.5" width="18" height="17" rx="2.5"/><path d="M16 2.5v4M8 2.5v4M3 10h18M7.5 14h9M7.5 17.5h5"/>',
+  panel: '<rect x="3" y="3" width="18" height="18" rx="2.5"/><path d="M15 3v18"/>',
+  flag: '<path d="M4 22V4a1 1 0 0 1 1-1h11l-2 4 2 4H5"/>',
+  grip: '<circle cx="9" cy="6" r="1.3" fill="currentColor" stroke="none"/><circle cx="15" cy="6" r="1.3" fill="currentColor" stroke="none"/><circle cx="9" cy="12" r="1.3" fill="currentColor" stroke="none"/><circle cx="15" cy="12" r="1.3" fill="currentColor" stroke="none"/><circle cx="9" cy="18" r="1.3" fill="currentColor" stroke="none"/><circle cx="15" cy="18" r="1.3" fill="currentColor" stroke="none"/>',
   steps: '<path d="M9 6h11M9 12h11M9 18h11"/><path d="M4 6l1 1 2-2M4 12l1 1 2-2M4 18l1 1 2-2"/>'
 };
 const icon = (n, cls) => '<svg class="ic ' + (cls || '') + '" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + IC[n] + '</svg>';
@@ -535,14 +624,14 @@ const REPEATS = { '': 'Does not repeat', daily: 'Daily', weekdays: 'Weekdays', w
 
 /* ---------------- state ---------------- */
 let S = { goals: [], lists: [], tasks: [] };
-const UI = { view: 'goals', focus: null, prevFocusKey: null, q: '', openTask: null, sorts: {}, showDone: {}, composer: null, burst: null, renaming: false, draft: { due: null, important: false, goal: '' } };
+const UI = { panelOff: (function () { try { return localStorage.getItem('orbit.panelOff') === '1'; } catch (e) { return false; } })(), collapsed: (function () { try { return JSON.parse(localStorage.getItem('orbit.collapsed') || '{}'); } catch (e) { return {}; } })(), lastNav: 0, view: 'goals', focus: null, prevFocusKey: null, q: '', openTask: null, sorts: {}, showDone: {}, composer: null, burst: null, renaming: false, draft: { due: null, important: false, goal: '' } };
 
 /* ---------------- storage (dual mode) ---------------- */
 const LS_KEY = 'orbit.v1';
 const COLS = {
   goals: ['id', 'parent_id', 'tier', 'title', 'note', 'color', 'target_date', 'done', 'metric_current', 'metric_target', 'metric_unit', 'template_key', 'sort', 'created_at'],
   lists: ['id', 'name', 'sort', 'created_at'],
-  tasks: ['id', 'list_id', 'goal_id', 'title', 'note', 'done', 'done_at', 'important', 'due', 'my_day', 'repeat', 'steps', 'sort', 'created_at']
+  tasks: ['id', 'list_id', 'goal_id', 'title', 'note', 'done', 'done_at', 'important', 'due', 'due_scope', 'rank', 'my_day', 'repeat', 'steps', 'sort', 'created_at']
 };
 function clean(table, row) {
   const o = {};
@@ -745,7 +834,7 @@ function toggleTask(id, opts) {
   updateTask(t, { done: !was, done_at: !was ? nowIso() : null });
   if (!was && t.repeat) {
     spawned = addTask({ list_id: t.list_id, goal_id: t.goal_id, title: t.title, note: t.note, important: t.important, repeat: t.repeat,
-      due: nextDue(t.due || today(), t.repeat), steps: (t.steps || []).map(s => ({ id: uid(), t: s.t, done: false })) });
+      due_scope: t.due_scope || null, due: t.due_scope === 'month' ? endOfMonth(addDays(t.due, 1)) : t.due_scope === 'week' ? addDays(t.due, 7) : nextDue(t.due || today(), t.repeat), steps: (t.steps || []).map(s => ({ id: uid(), t: s.t, done: false })) });
   }
   if (!was) toast(spawned ? 'Done. Next one is due ' + fmtShort(spawned.due) : 'Completed', () => {
     updateTask(t, { done: false, done_at: null });
@@ -777,19 +866,47 @@ function render() {
   invalidate();
   renderSide(); renderBnav();
   $('#goalsView').classList.toggle('on', UI.view === 'goals');
-  $('#tasksView').classList.toggle('on', UI.view !== 'goals');
-  if (UI.view === 'goals') { renderCrumbs(); renderStage(); renderPanel(); } else renderTasks();
+  $('#settingsView').classList.toggle('on', UI.view === 'settings');
+  $('#tasksView').classList.toggle('on', UI.view !== 'goals' && UI.view !== 'settings');
+  $('#goalsView').classList.toggle('panel-off', !!UI.panelOff);
+  if (UI.view === 'goals') { renderCrumbs(); renderStage(); renderPanel(); } else if (UI.view === 'settings') renderSettings(); else renderTasks();
   renderDrawer();
 }
-function renderLight() { invalidate(); renderSide(); if (UI.view === 'goals') { renderCrumbs(); renderStage(); } else renderTasks(); }
+function renderLight() { invalidate(); renderSide(); if (UI.view === 'goals') { renderCrumbs(); renderStage(); } else if (UI.view !== 'settings') renderTasks(); }
 
 /* ---------------- sidebar ---------------- */
+/* Soft deadlines: due_scope 'week' => due is that week's Sunday; 'month' => last day of the month.
+   Week deadlines surface in My Day from Thursday; month deadlines in the month's last 7 days (My Day + My Week). */
+const endOfWeek = d => { const x = parseD(d || today()); return addDays(ymd(x), 6 - ((x.getDay() + 6) % 7)); };
+const endOfMonth = d => { const x = parseD(d || today()); return ymd(new Date(x.getFullYear(), x.getMonth() + 1, 0)); };
+function deadlineActive(t) {
+  if (t.done || !t.due_scope || !t.due) return false;
+  return today() >= addDays(t.due, t.due_scope === 'week' ? -3 : -6);
+}
+function scopeLabel(t) {
+  const past = t.due < today();
+  if (t.due_scope === 'week') {
+    const ws = addDays(t.due, -6);
+    if (past) return 'Overdue, week of ' + fmtShort(ws);
+    return t.due === endOfWeek() ? 'This week' : 'Week of ' + fmtShort(ws);
+  }
+  const name = parseD(t.due).toLocaleDateString(undefined, { month: 'long' });
+  if (past) return 'Overdue, ' + name;
+  return t.due === endOfMonth() ? 'This month' : 'By end of ' + name;
+}
+const byRank = (a, b) => {
+  const ra = a.rank == null ? Infinity : +a.rank, rb = b.rank == null ? Infinity : +b.rank;
+  return ra !== rb ? ra - rb : String(b.created_at).localeCompare(String(a.created_at));
+};
+function weekRange() { const d = (new Date().getDay() + 6) % 7, ws = addDays(today(), -d); return [ws, addDays(ws, 6)]; }
+function inWeek(t) { const w = weekRange(); return t.my_day === today() || deadlineActive(t) || (t.due_scope === 'month' && t.due && !t.done && today() >= addDays(t.due, -6)) || (t.due && t.due >= w[0] && t.due <= w[1]) || (t.due && t.due < w[0] && !t.done); }
 const SMART = [
-  { v: 'myday', name: 'My Day', ic: 'sun', c: 'c-day', f: t => t.my_day === today() },
+  { v: 'myday', name: 'My Day', ic: 'sun', c: 'c-day', f: t => t.my_day === today() || deadlineActive(t) },
+  { v: 'myweek', name: 'My Week', ic: 'week', c: 'c-plan', f: inWeek },
+  { v: 'linked', name: 'By goal', ic: 'layers', c: 'c-link', f: t => !!t.goal_id },
   { v: 'important', name: 'Important', ic: 'star', c: 'c-imp', f: t => t.important },
   { v: 'planned', name: 'Planned', ic: 'cal', c: 'c-plan', f: t => !!t.due },
-  { v: 'linked', name: 'From goals', ic: 'link', c: 'c-link', f: t => !!t.goal_id },
-  { v: 'all', name: 'All', ic: 'layers', c: 'c-all', f: () => true },
+  { v: 'all', name: 'All', ic: 'list', c: 'c-all', f: () => true },
   { v: 'inbox', name: 'Tasks', ic: 'home', c: 'c-plan', f: t => !t.list_id }
 ];
 function viewFilter(v) { const s = SMART.find(x => x.v === v); if (s) return s.f; const id = v.slice(5); return t => t.list_id === id; }
@@ -811,7 +928,7 @@ function renderSide() {
   if (had) { const i = $('#newList'); i.value = val; i.focus(); }
 }
 function renderBnav() {
-  const items = [['goals', 'target', 'Goals'], ['myday', 'sun', 'My Day'], ['important', 'star', 'Important'], ['planned', 'cal', 'Planned'], ['menu', 'menu', 'Lists']];
+  const items = [['goals', 'target', 'Goals'], ['myday', 'sun', 'My Day'], ['myweek', 'week', 'My Week'], ['linked', 'layers', 'By goal'], ['menu', 'menu', 'More']];
   $('#bnav').innerHTML = items.map(i => '<button class="' + (UI.view === i[0] ? 'on' : '') + '" data-act="' + (i[0] === 'menu' ? 'openSide' : 'view') + '" data-v="' + i[0] + '">' + icon(i[1]) + i[2] + '</button>').join('');
 }
 
@@ -826,59 +943,119 @@ function renderCrumbs() {
 const nodeEls = new Map();
 let lastLayout = null;
 const GOAL_SIZE = [0, 0.125, 0.105, 0.092, 0.082, 0.074, 0.068];
+let _mctx;
+function textW(str, px, wt) {
+  if (!_mctx) _mctx = document.createElement('canvas').getContext('2d');
+  _mctx.font = wt + ' ' + px + 'px Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';
+  return _mctx.measureText(str).width;
+}
+function lineCount(title, px, wt, maxW) {
+  const words = String(title).trim().split(/\s+/), sp = textW(' ', px, wt);
+  let lines = 1, cur = 0;
+  words.forEach(w => {
+    const ww = textW(w, px, wt);
+    if (ww > maxW) { if (cur > 0) lines++; const n = Math.ceil(ww / maxW); lines += n - 1; cur = ww - (n - 1) * maxW; return; }
+    if (cur === 0) cur = ww; else if (cur + sp + ww <= maxW) cur += sp + ww; else { lines++; cur = ww; }
+  });
+  return lines;
+}
+/* Smallest radius (then smallest font) where the whole title fits inside the circle. */
+function fitText(title, fonts, wt, extraH, rMin, rMax) {
+  for (const px of fonts) for (let r = rMin; r <= rMax; r += 2) {
+    if (lineCount(title, px, wt, r * 1.3) * px * 1.2 + extraH <= r * 1.28) return { r: r, fs: px };
+  }
+  return { r: rMax, fs: fonts[fonts.length - 1] };
+}
+const ellPer = (a, b) => Math.PI * (3 * (a + b) - Math.sqrt((3 * a + b) * (a + 3 * b)));
+function placeRing(list, rx, ry, offset) {
+  const gap = 14, total = list.reduce((acc, it) => acc + 2 * it.r + gap, 0);
+  const per = ellPer(rx, ry); if (per < total) { const f = total / per; rx *= f; ry *= f; }
+  const s0 = (2 * list[0].r + gap) / total;
+  for (let tries = 0; tries < 25; tries++) {
+    // walk the ellipse by real arc length so spacing is even on tall or wide orbits
+    const N = 720, pts = [], cum = [0];
+    for (let i = 0; i <= N; i++) { const t = -Math.PI / 2 + offset + i / N * 2 * Math.PI; pts.push([rx * Math.cos(t), ry * Math.sin(t)]); if (i) cum.push(cum[i - 1] + Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1])); }
+    const P = cum[N]; let acc = 0;
+    list.forEach(it => {
+      const share = (2 * it.r + gap) / total;
+      const L = ((acc + share / 2 - s0 / 2) % 1 + 1) % 1 * P; acc += share;
+      let i = 0; while (i < N && cum[i + 1] < L) i++;
+      it.x = pts[i][0]; it.y = pts[i][1];
+    });
+    // grow the orbit until no two bubbles touch
+    let ok = true;
+    for (let a = 0; a < list.length && ok; a++) for (let b = a + 1; b < list.length; b++) {
+      const A = list[a], B = list[b];
+      if (Math.hypot(A.x - B.x, A.y - B.y) < A.r + B.r + 8) { ok = false; break; }
+    }
+    if (ok || list.length < 2) break;
+    rx *= 1.07; ry *= 1.07;
+  }
+  return { rx: rx, ry: ry };
+}
 function computeLayout() {
   const stage = $('#stage');
   const W = stage.clientWidth, H = stage.clientHeight, small = W < 640;
   const cx = W / 2, cy = H / 2, m = Math.min(W, H);
   const f = UI.focus, fg = f ? G(f) : null, depth = fg ? fg.tier : 0;
-  const items = [], rings = [];
-  const R0 = clamp(m * (0.15 - Math.min(depth, 5) * 0.007), 46, 96);
   const focusHue = fg ? hueOf(fg) : HUES.blue;
-  items.push({ key: f || 'root', id: f, kind: f ? 'goal' : 'root', role: 'center', x: cx, y: cy, r: R0 });
-  if (fg) { const pr = small ? 20 : 26; items.push({ key: fg.parent_id || 'root', id: fg.parent_id, kind: fg.parent_id ? 'goal' : 'root', role: 'parent', x: pr + 16, y: pr + 14, r: pr }); }
-  const goals = kidsOf(f).map(g => ({ key: g.id, id: g.id, kind: 'goal', role: 'orbit' }));
+  const M = small ? 8 : 18, AX = W / 2 - M, AY = H / 2 - M;
+  // center
+  const cTitle = fg ? fg.title : rootName();
+  const cBase = clamp(m * (0.15 - Math.min(depth, 5) * 0.007), 46, 96);
+  const cf = fitText(cTitle, small ? [13.5, 12.5, 11.5] : [17, 15.5, 14], 700, 32, cBase, cBase * 1.7);
+  const center = { key: f || 'root', id: f, kind: f ? 'goal' : 'root', role: 'center', x: 0, y: 0, r: cf.r, fs: cf.fs };
+  // orbit
+  const goalBase = clamp(m * GOAL_SIZE[Math.min(depth + 1, 6)], small ? 34 : 38, 76);
+  const taskBase = clamp(m * 0.052, small ? 30 : 24, 34);
+  const goals = kidsOf(f).map(g => {
+    const mz = measure(g.id), hasVal = g.done || mz.p !== null;
+    const ft = fitText(g.title, small ? [11.5, 10.5, 9.5] : [12.5, 11.5, 10.5], 600, hasVal ? 16 : 0, goalBase, goalBase * 1.8);
+    return { key: g.id, id: g.id, kind: 'goal', role: 'orbit', r: ft.r, fs: ft.fs };
+  });
   const ts = fg ? tasksOf(f).sort((a, b) => (a.done - b.done) || ((a.sort || 0) - (b.sort || 0)))
                 : S.tasks.filter(t => !t.goal_id && !t.done).sort((a, b) => (b.sort || 0) - (a.sort || 0));
   const cap = small ? 8 : 12, tl = [];
-  ts.slice(0, cap).forEach(t => tl.push({ key: 't:' + t.id, id: t.id, kind: 'task', role: 'orbit', loose: !fg }));
-  if (ts.length > cap) tl.push({ key: 'more:' + (f || 'root'), kind: 'more', role: 'orbit', n: ts.length - cap });
-  const add = { key: 'add:' + (f || 'root'), kind: 'add', role: 'orbit' };
-  const M = small ? 8 : 18, maxRx = W / 2 - M, maxRy = H / 2 - M;
-  const goalR = clamp(m * GOAL_SIZE[Math.min(depth + 1, 6)], small ? 34 : 38, 76);
-  const taskR = clamp(m * 0.052, small ? 30 : 24, 34);
-  const roomForTwo = R0 + 2 * goalR + 2 * taskR + 30 <= Math.min(maxRx, maxRy);
-  const two = goals.length > 0 && tl.length > 0 && roomForTwo;
-  const r1 = two ? goals.concat([add]) : goals.concat(tl, [add]), r2 = two ? tl : [];
-  const baseR = k => (k.kind === 'task' || k.kind === 'more') ? taskR : k.kind === 'add' ? Math.max(taskR, goalR * 0.72) : goalR;
+  ts.slice(0, cap).forEach(t => {
+    const ft = fitText(t.title, [10.5, 9.5, 9], 500, 18, taskBase, taskBase * 1.9);
+    tl.push({ key: 't:' + t.id, id: t.id, kind: 'task', role: 'orbit', loose: !fg, r: ft.r, fs: ft.fs });
+  });
+  if (ts.length > cap) tl.push({ key: 'more:' + (f || 'root'), kind: 'more', role: 'orbit', n: ts.length - cap, r: taskBase });
+  const tMax = tl.length ? Math.max.apply(null, tl.map(x => x.r)) : 0;
+  goals.forEach(g => { if (g.r < tMax + 4) g.r = tMax + 4; }); // tasks always smallest
+  const gMax = goals.length ? Math.max.apply(null, goals.map(x => x.r)) : goalBase;
+  const add = { key: 'add:' + (f || 'root'), kind: 'add', role: 'orbit', r: Math.max(taskBase, Math.min(gMax, goalBase) * 0.72) };
+  const R0 = center.r;
   const fit = (rx, ry) => { rx = Math.min(rx, ry * 1.6); ry = Math.min(ry, rx * 1.6); return [rx, ry]; };
-  function ring(list, rx, ry, rMax, offset) {
-    const n = list.length; if (!n) return;
-    const per = 2 * Math.PI * Math.sqrt((rx * rx + ry * ry) / 2);
-    list.forEach((it, i) => {
-      const r = Math.min(baseR(it), per / n * 0.42, rMax);
-      const a = -Math.PI / 2 + offset + i * 2 * Math.PI / n;
-      it.x = cx + rx * Math.cos(a); it.y = cy + ry * Math.sin(a); it.r = Math.max(r, 16); items.push(it);
-    });
-    rings.push({ rx: rx, ry: ry });
-  }
+  const rings = [];
+  const two = goals.length > 0 && tl.length > 0 && R0 + 2 * gMax + 2 * tMax + 34 <= Math.min(AX, AY);
   if (!two) {
-    const rc = Math.max.apply(null, r1.map(baseR));
-    const d = fit(maxRx - rc, maxRy - rc), minD = R0 + rc * 0.8 + 18;
-    ring(r1, Math.max(d[0], minD), Math.max(d[1], minD), Math.max(18, Math.min(d[0], d[1]) - R0 - 12), 0);
+    const list = goals.concat(tl, [add]), rMax = Math.max.apply(null, list.map(x => x.r));
+    let d = fit(AX - rMax, AY - rMax); const minD = R0 + rMax + 16;
+    rings.push(placeRing(list, Math.max(d[0], minD), Math.max(d[1], minD), 0));
   } else {
-    const rt = taskR, o = fit(maxRx - rt, maxRy - rt);
-    const ix = Math.max(R0 + goalR + 14, (R0 + o[0]) * 0.5), iy = Math.max(R0 + goalR + 14, (R0 + o[1]) * 0.5);
-    const rMax1 = Math.max(18, Math.min(Math.min(ix, iy) - R0 - 10, (Math.min(o[0], o[1]) - Math.min(ix, iy)) * 0.55));
-    ring(r1, ix, iy, rMax1, 0);
-    ring(r2, o[0], o[1], rt, Math.PI / r2.length);
+    const inner = goals.concat([add]); const k = AX / AY; let ix = R0 + gMax + 18, iy = ix;
+    if (k > 1) ix *= Math.min(k, 1.4); else iy *= Math.min(1 / k, 1.4);
+    const ri = placeRing(inner, ix, iy, 0); rings.push(ri);
+    const base = fit(AX - tMax, AY - tMax);
+    rings.push(placeRing(tl, Math.max(base[0], ri.rx + gMax + tMax + 16), Math.max(base[1], ri.ry + gMax + tMax + 16), Math.PI / tl.length));
   }
+  // scale the whole scene down if it does not fit the screen
+  const orbit = goals.concat(tl, [add]);
+  let ext = Math.max(R0 / AX, R0 / AY);
+  orbit.forEach(it => { ext = Math.max(ext, (Math.abs(it.x) + it.r) / AX, (Math.abs(it.y) + it.r) / AY); });
+  const sc = ext > 1 ? Math.max(0.5, 1 / ext) : 1;
+  const items = [center].concat(orbit);
+  items.forEach(it => { it.x = cx + it.x * sc; it.y = cy + it.y * sc; it.r *= sc; if (it.fs) it.fs *= sc; });
+  rings.forEach(r => { r.rx *= sc; r.ry *= sc; });
+  if (fg) { const pr = small ? 20 : 26; items.push({ key: fg.parent_id || 'root', id: fg.parent_id, kind: fg.parent_id ? 'goal' : 'root', role: 'parent', x: pr + 16, y: pr + 14, r: pr }); }
   items.forEach(it => {
     if (it.kind === 'goal') it.hue = hueOf(G(it.id));
     else if (it.kind === 'root') it.hue = HUES.blue;
     else if (!fg && (it.kind === 'task' || it.kind === 'more')) it.hue = '#8b98a9';
     else it.hue = focusHue;
   });
-  return { W: W, H: H, cx: cx, cy: cy, items: items, rings: rings, center: items[0] };
+  return { W: W, H: H, cx: cx, cy: cy, items: items, rings: rings, center: center, s: sc };
 }
 function ringSVG(p) {
   const v = Math.round(p * 100);
@@ -890,13 +1067,14 @@ function satsHTML(id) {
   for (let i = 0; i < n; i++) { const a = -Math.PI / 2 + i * 2 * Math.PI / n; h += '<i style="left:' + (50 + 50 * Math.cos(a)).toFixed(2) + '%;top:' + (50 + 50 * Math.sin(a)).toFixed(2) + '%"></i>'; }
   return h + '</span>';
 }
+const fsAttr = it => it.fs ? ' style="font-size:' + it.fs.toFixed(1) + 'px"' : '';
 function nodeInfo(it) {
   const role = it.role;
   let cls = it.kind, inner = '', ring = '', sats = '', ext = '', label = '', act = '';
   if (it.kind === 'root') {
     const n = kidsOf(null).length, ms = measured(null);
     label = rootName() + (ms ? ', ' + pct(null) + '% overall' : '');
-    if (role === 'center') { ring = ringSVG(ms ? prog(null) : 0); inner = '<span class="lbl">' + n + ' goal' + (n === 1 ? '' : 's') + '</span><span class="ttl">' + esc(rootName()) + '</span>' + (ms ? '<span class="pct">' + pct(null) + '%</span>' : ''); act = 'centerTap'; }
+    if (role === 'center') { ring = ringSVG(ms ? prog(null) : 0); inner = '<span class="lbl">' + n + ' goal' + (n === 1 ? '' : 's') + '</span><span class="ttl"' + fsAttr(it) + '>' + esc(rootName()) + '</span>' + (ms ? '<span class="pct">' + pct(null) + '%</span>' : ''); act = 'centerTap'; }
     else { inner = icon('up'); ext = rootName(); act = 'focus'; label = 'Back to ' + rootName(); }
   } else if (it.kind === 'goal') {
     const g = G(it.id), mz = measure(g.id), ms = mz.p !== null;
@@ -907,13 +1085,13 @@ function nodeInfo(it) {
     else {
       ring = ringSVG(ms ? mz.p : 0);
       const badge = g.done ? '<span class="badge">' + icon('check') + '</span>' : '';
-      if (role === 'center') { inner = '<span class="lbl">' + levelLong(g.tier) + '</span><span class="ttl">' + esc(g.title) + '</span>' + (val ? '<span class="pct">' + esc(val) + '</span>' : '<span class="pct dim">Add steps</span>') + badge; act = 'centerTap'; }
-      else { inner = '<span class="ttl">' + esc(g.title) + '</span>' + (val ? '<span class="pct">' + esc(val) + '</span>' : '') + badge; sats = satsHTML(g.id); act = 'focus'; }
+      if (role === 'center') { inner = '<span class="lbl">' + levelLong(g.tier) + '</span><span class="ttl"' + fsAttr(it) + '>' + esc(g.title) + '</span>' + (val ? '<span class="pct">' + esc(val) + '</span>' : '<span class="pct dim">Add steps</span>') + badge; act = 'centerTap'; }
+      else { inner = '<span class="ttl"' + fsAttr(it) + '>' + esc(g.title) + '</span>' + (val ? '<span class="pct">' + esc(val) + '</span>' : '') + badge; sats = satsHTML(g.id); act = 'focus'; }
     }
   } else if (it.kind === 'task') {
     const t = T(it.id); if (t.done) cls += ' done'; if (it.loose) cls += ' loose';
-    inner = '<span class="tchk">' + (t.done ? icon('check') : '') + '</span><span class="ttl">' + esc(t.title) + '</span>';
-    label = (t.done ? 'Completed task: ' : 'Task: ') + t.title + '. Activate to toggle.'; act = 'bubbleTask';
+    inner = '<span class="tchk">' + (t.done ? icon('check') : '') + '</span><span class="ttl"' + fsAttr(it) + '>' + esc(t.title) + '</span>';
+    label = (t.done ? 'Completed task: ' : 'Task: ') + t.title + '. Opens details.'; act = 'openTask';
   } else if (it.kind === 'add') {
     inner = icon('plus', 'sm') + '<span class="ttl">Add</span>';
     label = UI.focus ? 'Add a sub-goal or task' : 'Add a goal or task'; act = 'compose';
@@ -921,7 +1099,7 @@ function nodeInfo(it) {
   cls += ' ' + role;
   const html = '<span class="float">' + ring + sats + '<span class="body">' + inner + '</span></span>' + (ext ? '<span class="ext">' + esc(ext) + '</span>' : '');
   let tip = '';
-  if (it.kind === 'goal') tip = G(it.id).title; else if (it.kind === 'task') tip = T(it.id).title + '\nClick to check off, right-click for details, drag onto a goal to move';
+  if (it.kind === 'goal') tip = G(it.id).title; else if (it.kind === 'task') tip = T(it.id).title;
   return { cls: cls, html: html, label: label, act: act, tip: tip };
 }
 function place(el, x, y, r) { el.style.width = el.style.height = (2 * r).toFixed(1) + 'px'; el.style.transform = 'translate(' + (x - r).toFixed(1) + 'px,' + (y - r).toFixed(1) + 'px)'; }
@@ -946,7 +1124,7 @@ function renderStage() {
       el.style.transitionDelay = (newIdx++ * 28) + 'ms';
     } else el.style.transitionDelay = '0ms';
     el.className = 'node ' + info.cls + (UI.burst === it.key ? ' burst' : '');
-    el.style.setProperty('--h', it.hue);
+    el.style.setProperty('--h', it.hue); el.style.setProperty('--sc', Lo.s || 1);
     el.style.setProperty('--d', (-(hash(it.key) % 6000) / 1000) + 's');
     el.dataset.act = info.act; el.dataset.id = it.id || ''; el.dataset.key = it.key;
     el.setAttribute('aria-label', info.label); el.title = info.tip || '';
@@ -1013,16 +1191,19 @@ function composerSubmit() {
 function taskRowHTML(t, opts) {
   opts = opts || {};
   const meta = [];
-  if (opts.showList !== false) { const ln = t.list_id ? (L(t.list_id) || {}).name : 'Tasks'; if (ln && opts.showList) meta.push('<span class="meta">' + esc(ln) + '</span>'); }
+  if (opts.showList && t.list_id) { const ln = (L(t.list_id) || {}).name; if (ln) meta.push('<span class="meta">' + icon('list') + esc(ln) + '</span>'); }
   if (t.my_day === today() && opts.view !== 'myday') meta.push('<span class="meta">' + icon('sun') + 'My Day</span>');
-  if (t.due) { const dd = dayDiff(t.due); const cls = !t.done && dd < 0 ? 'over' : (dd === 0 ? 'today' : ''); const lab = dd === 0 ? 'Today' : dd === 1 ? 'Tomorrow' : dd === -1 ? 'Yesterday' : fmtShort(t.due); meta.push('<span class="meta ' + cls + '">' + icon('cal') + lab + '</span>'); }
+  if (t.due && t.due_scope) meta.push('<span class="meta scope ' + (!t.done && t.due < today() ? 'over' : deadlineActive(t) ? 'today' : '') + '">' + icon('flag') + esc(scopeLabel(t)) + '</span>');
+  else if (t.due) { const dd = dayDiff(t.due); const cls = !t.done && dd < 0 ? 'over' : (dd === 0 ? 'today' : ''); const lab = dd === 0 ? 'Today' : dd === 1 ? 'Tomorrow' : dd === -1 ? 'Yesterday' : fmtShort(t.due); meta.push('<span class="meta ' + cls + '">' + icon('cal') + lab + '</span>'); }
   if (t.repeat) meta.push('<span class="meta">' + icon('repeat') + '</span>');
   if (t.steps && t.steps.length) meta.push('<span class="meta">' + t.steps.filter(s => s.done).length + ' of ' + t.steps.length + '</span>');
   if (t.note) meta.push('<span class="meta">' + icon('note') + '</span>');
-  if (t.goal_id && opts.showGoal !== false) { const g = G(t.goal_id); if (g) meta.push('<span class="meta gchip"><i class="hdot" style="--h:' + hueOf(g) + '"></i><span>' + esc(g.title) + '</span></span>'); }
+  const pg = t.goal_id && opts.showGoal !== false ? G(t.goal_id) : null;
+  const pathLine = pg ? '<div class="tpath" title="' + esc(goalPathText(pg.id, true)) + '"><i class="hdot" style="--h:' + hueOf(pg) + '"></i><span>' + esc(goalPathText(pg.id)) + '</span></div>' : '';
   return '<div class="trow ' + (t.done ? 'done ' : '') + (UI.openTask === t.id ? 'open' : '') + '" data-act="openTask" data-id="' + t.id + '">' +
+    (opts.drag && !t.done ? '<span class="grip" aria-label="Drag to reorder" title="Drag to reorder">' + icon('grip') + '</span>' : '') +
     '<button class="chk" data-act="toggleTask" data-id="' + t.id + '" aria-label="' + (t.done ? 'Mark not complete' : 'Mark complete') + '">' + icon('check') + '</button>' +
-    '<div class="tmain"><div class="ttitle">' + esc(t.title) + '</div>' + (meta.length ? '<div class="tmeta">' + meta.join('') + '</div>' : '') + '</div>' +
+    '<div class="tmain"><div class="ttitle">' + esc(t.title) + '</div>' + pathLine + (meta.length ? '<div class="tmeta">' + meta.join('') + '</div>' : '') + '</div>' +
     '<button class="star ' + (t.important ? 'on' : '') + '" data-act="starTask" data-id="' + t.id + '" aria-label="' + (t.important ? 'Remove importance' : 'Mark as important') + '">' + icon('star') + '</button></div>';
 }
 function goalRowHTML(g) {
@@ -1038,7 +1219,8 @@ function renderPanel() {
   const hue = g ? hueOf(g) : HUES.blue;
   const mz = measure(f), p = pct(f), ms = mz.p !== null;
   const peekVal = g && g.done ? 'Achieved' : g && mz.how === 'metric' ? metricText(g) : ms ? p + '%' : '';
-  let h = '<button class="peek" data-act="sheet"><span class="hdot" style="--h:' + hue + '"></span><span class="t">' + esc(g ? g.title : rootName()) + '</span><span class="p">' + esc(peekVal) + '</span>' + icon('up') + '</button><div class="pp" style="--h:' + hue + '">';
+  let h = '<div class="peek" data-act="sheet" role="button" tabindex="0"><span class="hdot" style="--h:' + hue + '"></span><span class="t">' + esc(g ? g.title : rootName()) + '</span><span class="p">' + esc(peekVal) + '</span>' + icon('up') + '<button class="iconbtn" data-act="hidePanel" aria-label="Hide details">' + icon('x', 'sm') + '</button></div>' +
+    '<button class="iconbtn panel-x" data-act="hidePanel" title="Hide details" aria-label="Hide details">' + icon('panel') + '</button><div class="pp" style="--h:' + hue + '">';
   if (!g) {
     const vs = kidsOf(null), bt = branchTasks(null), floating = S.tasks.filter(t => !t.goal_id && !t.done).length;
     h += '<div class="ptier"><b>Main bubble</b><span>tap the name to rename it</span></div>' +
@@ -1049,8 +1231,7 @@ function renderPanel() {
       '<label class="addrow">' + icon('plus') + '<input data-add="goal" placeholder="Add a goal" autocomplete="off"></label></section>' +
       '<button class="btn ghost" data-act="openAdd" data-t="goal">' + icon('sparkle', 'sm') + 'Browse goal ideas</button>' +
       (floating ? '<button class="grow-row" data-act="view" data-v="all"><i class="hdot" style="--h:#8b98a9"></i><span class="t">' + floating + ' unassigned task' + (floating === 1 ? '' : 's') + ' floating on the map</span>' + icon('right', 'sm muted') + '</button>' : '') +
-      '<p class="small muted">How progress works: a goal\'s percent is the average of what is inside it. Sub-goals count by their own percent, tasks count once checked off (steps give partial credit), and repeating tasks are left out because they are habits. A goal with nothing inside yet shows no percent. For goals like saving money or reading books, switch it to track a number instead.</p>' +
-      '<button class="btn danger" data-act="startFresh">' + icon('trash', 'sm') + 'Start fresh (delete everything)</button>';
+      '<p class="small muted">How progress works: a goal\'s percent is the average of what is inside it. Sub-goals count by their own percent, tasks count once checked off (steps give partial credit), and repeating tasks are left out because they are habits. A goal with nothing inside yet shows no percent. For goals like saving money or reading books, switch it to track a number instead.</p><p class="small muted">Tips: tap a goal to go deeper, double-click it for details, tap a task for details. Right-click or long-press any bubble for quick options. Drag a bubble onto a goal to move it.</p>';
   } else {
     const kids = kidsOf(g.id), ts = tasksOf(g.id).sort((a, b) => (a.done - b.done) || ((b.sort || 0) - (a.sort || 0)));
     const parent = g.parent_id ? G(g.parent_id) : null, isNum = +g.metric_target > 0;
@@ -1092,7 +1273,8 @@ function viewTitle(v) {
   if (UI.q) return { title: 'Search', sub: 'Results for "' + UI.q + '"' };
   const s = SMART.find(x => x.v === v);
   if (v === 'myday') return { title: 'My Day', sub: fmtLong(today()) };
-  if (v === 'linked') return { title: 'From goals', sub: 'Every task connected to a vision, milestone, or objective' };
+  if (v === 'linked') return { title: 'By goal', sub: 'Every goal and sub-goal with its tasks' };
+  if (v === 'myweek') { const w = weekRange(); return { title: 'My Week', sub: fmtShort(w[0]) + ' to ' + fmtShort(w[1]) }; }
   if (s) return { title: s.name, sub: '' };
   const l = L(v.slice(5)); return { title: l ? l.name : 'List', sub: '', list: l };
 }
@@ -1113,7 +1295,7 @@ function renderTasks() {
   if (meta.list && UI.renaming) head += '<div class="h1"><input id="renameInput" value="' + esc(meta.list.name) + '" aria-label="List name"></div>';
   else head += '<div class="h1">' + esc(meta.title) + '</div>';
   head += (meta.sub ? '<div class="tsub">' + esc(meta.sub) + '</div>' : '') + '</div><div class="tools">';
-  if (!UI.q) head += '<label class="chip" title="Sort">' + icon('sort', 'sm') + '<select data-act-change="sort" aria-label="Sort">' +
+  if (!UI.q && v !== 'linked' && v !== 'myweek' && v !== 'myday') head += '<label class="chip" title="Sort">' + icon('sort', 'sm') + '<select data-act-change="sort" aria-label="Sort">' +
     [['created', 'Newest'], ['due', 'Due date'], ['important', 'Importance'], ['alpha', 'A to Z']].map(o => '<option value="' + o[0] + '"' + (o[0] === sortMode ? ' selected' : '') + '>' + o[1] + '</option>').join('') + '</select></label>';
   if (meta.list) head += '<button class="iconbtn" data-act="renameList" title="Rename list">' + icon('pencil') + '</button><button class="iconbtn" data-act="deleteList" title="Delete list">' + icon('trash') + '</button>';
   head += '</div>';
@@ -1123,12 +1305,17 @@ function renderTasks() {
   let arr = UI.q ? S.tasks.filter(t => (t.title + ' ' + (t.note || '')).toLowerCase().indexOf(UI.q.toLowerCase()) >= 0) : S.tasks.filter(viewFilter(v));
   const open = sortTasks(arr.filter(t => !t.done), sortMode), done = arr.filter(t => t.done).sort((a, b) => String(b.done_at).localeCompare(String(a.done_at)));
   const showList = v !== 'inbox' && v.indexOf('list:') !== 0;
-  const row = t => taskRowHTML(t, { showList: showList, view: v });
+  const manual = (v === 'myday' || v === 'myweek') && !UI.q;
+  if (manual) open.sort(byRank);
+  const row = t => taskRowHTML(t, { showList: showList, view: v, drag: manual });
+  const dgroup = (key, items) => '<div class="dgroup" data-group="' + key + '">' + items.map(row).join('') + '</div>';
   let h = '';
   if (!UI.q && v !== 'linked') {
     const d = UI.draft;
-    h += '<div class="addbar ' + (d.due || d.important || d.goal ? 'has' : '') + '"><div class="top">' + icon('plus') + '<input id="addInput" placeholder="Add a task" autocomplete="off"></div><div class="opts">' +
+    h += '<div class="addbar ' + (d.due || d.important || d.goal || d.scope ? 'has' : '') + '"><div class="top">' + icon('plus') + '<input id="addInput" placeholder="Add a task" autocomplete="off"></div><div class="opts">' +
       '<label class="chip ' + (d.due ? 'on' : '') + '">' + icon('cal', 'sm') + (d.due ? fmtShort(d.due) : 'Due date') + '<input type="date" id="draftDue" value="' + (d.due || '') + '"></label>' +
+      '<button class="chip ' + (d.scope === 'week' ? 'on' : '') + '" data-act="draftScope" data-s="week">' + icon('flag', 'sm') + 'This week</button>' +
+      '<button class="chip ' + (d.scope === 'month' ? 'on' : '') + '" data-act="draftScope" data-s="month">' + icon('flag', 'sm') + 'This month</button>' +
       '<button class="chip ' + (d.important ? 'on' : '') + '" data-act="draftStar">' + icon('star', 'sm') + 'Important</button>' +
       '<label class="chip ' + (d.goal ? 'on' : '') + '">' + icon('target', 'sm') + '<select id="draftGoal" aria-label="Link to goal"><option value="">Link to goal</option>' + goalOptions(d.goal) + '</select></label>' +
       '</div></div>';
@@ -1138,10 +1325,27 @@ function renderTasks() {
     if (sug.length) h += '<div class="suggest"><div class="sec-h" style="margin:0 0 4px">' + icon('sun', 'sm c-day') + 'Suggested for today</div>' + sug.map(t =>
       '<div class="srow"><span class="t">' + esc(t.title) + '</span><span class="small ' + (dayDiff(t.due) < 0 ? 'meta over' : 'muted') + '">' + (dayDiff(t.due) < 0 ? 'Overdue' : 'Due today') + '</span><button class="chip" data-act="toMyDay" data-id="' + t.id + '">' + icon('plus', 'sm') + 'Add</button></div>').join('') + '</div>';
   }
+  if (v === 'linked' && !UI.q) {
+    h += goalTreeHTML();
+    $('#tlist').innerHTML = h; return;
+  }
   if (!open.length && !done.length) {
-    const E = { myday: ['Focus on your day', 'Add what you want to get done today, or pull in something suggested.'], important: ['Nothing starred', 'Star a task to see it here.'], planned: ['Nothing scheduled', 'Tasks with a due date show up here.'], linked: ['No goal tasks yet', 'Open a goal in Goals and add tasks to it. They show up here and in your lists.'] };
+    const E = { myweek: ['Nothing this week', 'Tasks due Monday to Sunday and your My Day tasks show up here.'], myday: ['Focus on your day', 'Add what you want to get done today, or pull in something suggested.'], important: ['Nothing starred', 'Star a task to see it here.'], planned: ['Nothing scheduled', 'Tasks with a due date show up here.'], linked: ['No goal tasks yet', 'Open a goal in Goals and add tasks to it. They show up here and in your lists.'] };
     const e = UI.q ? ['No matches', 'Try a different word.'] : (E[v] || ['All clear', 'Add a task to get started.']);
     h += '<div class="empty"><div class="big">' + e[0] + '</div>' + e[1] + '</div>';
+  } else if (v === 'myweek' && !UI.q) {
+    const w = weekRange(), td = today();
+    const groupOf = t => t.due_scope ? 'dl' : t.my_day === td ? td : (t.due < td ? 'over' : t.due);
+    const keys = ['dl', 'over'].concat([0, 1, 2, 3, 4, 5, 6].map(i => addDays(w[0], i)));
+    keys.forEach(k => {
+      const items = open.filter(t => groupOf(t) === k); if (!items.length) return;
+      const label = k === 'dl' ? 'Deadlines' : k === 'over' ? 'Overdue' : k === td ? 'Today' : k === addDays(td, 1) ? 'Tomorrow' : fmtShort(k);
+      h += '<div class="group-h ' + (k === 'over' ? 'over' : k === 'dl' ? 'dl' : '') + '">' + (k === 'dl' ? icon('flag', 'sm') : '') + label + ' <span class="mono small muted">' + items.length + '</span></div>' + dgroup(k, items);
+    });
+  } else if (v === 'myday' && !UI.q) {
+    const dl = open.filter(deadlineActive), rest = open.filter(t => !deadlineActive(t));
+    if (dl.length) h += '<div class="group-h dl">' + icon('flag', 'sm') + 'Deadlines <span class="mono small muted">' + dl.length + '</span></div>' + dgroup('dl', dl);
+    if (rest.length) h += (dl.length ? '<div class="group-h">Today <span class="mono small muted">' + rest.length + '</span></div>' : '') + dgroup('day', rest);
   } else if (v === 'planned' && !UI.q) {
     const groups = [['Overdue', t => dayDiff(t.due) < 0, 'over'], ['Today', t => dayDiff(t.due) === 0], ['Tomorrow', t => dayDiff(t.due) === 1], ['This week', t => dayDiff(t.due) > 1 && dayDiff(t.due) <= 7], ['Later', t => dayDiff(t.due) > 7]];
     groups.forEach(gr => { const items = open.filter(gr[1]); if (items.length) h += '<div class="group-h ' + (gr[2] || '') + '">' + gr[0] + ' <span class="mono small muted">' + items.length + '</span></div>' + items.map(row).join(''); });
@@ -1154,6 +1358,32 @@ function renderTasks() {
   $('#tlist').innerHTML = h;
   if (ai !== null) { const i = $('#addInput'); i.value = ai; i.focus(); }
 }
+function goalTreeHTML() {
+  const showDone = !!UI.showDone.linked;
+  let h = '<button class="sec-toggle ' + (showDone ? '' : 'closed') + '" data-act="toggleDone" style="margin-top:4px">' + icon('down', 'sm') + (showDone ? 'Hide completed tasks' : 'Show completed tasks') + '</button>';
+  const sec = g => {
+    const closed = !!UI.collapsed[g.id], mz = measure(g.id);
+    const ts = tasksOf(g.id).filter(t => showDone || !t.done).sort((a, b) => (a.done - b.done) || String(a.due || '9').localeCompare(String(b.due || '9')));
+    const open = branchTasks(g.id).filter(t => !t.done).length;
+    const val = g.done ? 'done' : mz.how === 'metric' ? metricText(g) : mz.p !== null ? pct(g.id) + '%' : '';
+    let x = '<div class="gsec" style="--h:' + hueOf(g) + '"><div class="gsec-h ' + (closed ? 'closed' : '') + '" data-act="toggleSec" data-id="' + g.id + '" role="button" tabindex="0">' + icon('down', 'sm chev') + '<i class="hdot"></i><span class="t">' + esc(g.title) + '</span>' +
+      (val ? '<span class="v mono">' + esc(val) + '</span>' : '') + '<span class="n mono">' + open + ' open</span><button class="iconbtn sm" data-act="openGoalMap" data-id="' + g.id + '" title="Open on the goal map" aria-label="Open on the goal map">' + icon('target', 'sm') + '</button></div>';
+    if (!closed) x += '<div class="gsec-b">' + ts.map(t => taskRowHTML(t, { showGoal: false, view: 'linked', showList: true })).join('') + kidsOf(g.id).map(sec).join('') +
+      '<label class="addrow slim">' + icon('plus') + '<input data-addtask-goal="' + g.id + '" placeholder="Add a task" autocomplete="off"></label></div>';
+    return x + '</div>';
+  };
+  const tops = kidsOf(null);
+  if (!tops.length) h += '<div class="empty"><div class="big">No goals yet</div>Add goals on the Goals map and they show up here with their tasks.</div>';
+  h += tops.map(sec).join('');
+  const loose = S.tasks.filter(t => !t.goal_id && (showDone || !t.done));
+  if (loose.length) {
+    const closed = !!UI.collapsed.__none;
+    h += '<div class="gsec" style="--h:#8b98a9"><div class="gsec-h ' + (closed ? 'closed' : '') + '" data-act="toggleSec" data-id="__none" role="button" tabindex="0">' + icon('down', 'sm chev') + '<i class="hdot"></i><span class="t">No goal yet</span><span class="n mono">' + loose.filter(t => !t.done).length + ' open</span></div>' +
+      (closed ? '' : '<div class="gsec-b">' + loose.map(t => taskRowHTML(t, { view: 'linked', showList: true })).join('') + '</div>') + '</div>';
+  }
+  return h;
+}
+function goalPathText(gid, full) { const p = pathOf(gid).map(x => x.title); return !full && p.length > 2 ? p[0] + ' › … › ' + p[p.length - 1] : p.join(' › '); }
 function goalOptions(sel) {
   let h = '';
   const walk = (id, depth) => kidsOf(id).forEach(g => { h += '<option value="' + g.id + '"' + (g.id === sel ? ' selected' : '') + '>' + '\u00a0\u00a0\u00a0'.repeat(depth) + esc(g.title) + '</option>'; walk(g.id, depth + 1); });
@@ -1164,10 +1394,12 @@ function addFromBar() {
   const f = { title: v }, view = UI.view, d = UI.draft;
   if (view === 'myday') f.my_day = today();
   if (view === 'important') f.important = true;
-  if (view === 'planned') f.due = today();
+  if (view === 'planned' || view === 'myweek') f.due = today();
   if (view.indexOf('list:') === 0) f.list_id = view.slice(5);
   if (d.due) f.due = d.due; if (d.important) f.important = true; if (d.goal) f.goal_id = d.goal;
-  addTask(f); inp.value = ''; UI.draft = { due: null, important: false, goal: '' };
+  if (d.scope) { f.due_scope = d.scope; f.due = d.scope === 'week' ? endOfWeek() : endOfMonth(); }
+  if (view === 'myday' || view === 'myweek') { const rs = S.tasks.filter(t => t.rank != null).map(t => +t.rank); f.rank = (rs.length ? Math.min.apply(null, rs) : 1) - 1; }
+  addTask(f); inp.value = ''; UI.draft = { due: null, important: false, goal: '', scope: null };
   render(); $('#addInput').focus();
 }
 
@@ -1188,8 +1420,11 @@ function renderDrawer() {
     (t.steps || []).map(s => '<div class="step ' + (s.done ? 'done' : '') + '"><button class="chk ' + (s.done ? 'on' : '') + '" data-act="toggleStep" data-sid="' + s.id + '" aria-label="Toggle step">' + icon('check') + '</button><input type="text" data-step="' + s.id + '" value="' + esc(s.t) + '" aria-label="Step"><button class="iconbtn x" data-act="delStep" data-sid="' + s.id + '" aria-label="Delete step">' + icon('x', 'sm') + '</button></div>').join('') +
     '<div class="step">' + icon('plus', 'sm') + '<input type="text" id="addStep" placeholder="' + ((t.steps || []).length ? 'Next step' : 'Add a step') + '" autocomplete="off"></div></div>';
   h += '<div class="card"><button class="frow ' + (myday ? 'on' : '') + '" data-act="myDayToggle" style="width:100%">' + icon('sun') + '<span class="grow">' + (myday ? 'Added to My Day' : 'Add to My Day') + '</span>' + (myday ? icon('x', 'sm') : '') + '</button></div>';
-  h += '<div class="card"><div class="frow">' + icon('cal') + '<span class="grow">Due</span><input type="date" data-tfield="due" value="' + (t.due || '') + '"></div>' +
-    '<div class="qchips"><button data-act="quickDue" data-n="0">Today</button><button data-act="quickDue" data-n="1">Tomorrow</button><button data-act="quickDue" data-n="7">Next week</button>' + (t.due ? '<button data-act="quickDue" data-n="clear">Clear</button>' : '') + '</div>' +
+  h += '<div class="card"><div class="frow">' + icon('cal') + '<span class="grow">' + (t.due_scope ? 'Deadline: <b style="color:var(--text)">' + esc(scopeLabel(t)) + '</b>' : 'Due') + '</span><input type="date" data-tfield="due" value="' + (t.due || '') + '"></div>' +
+    '<div class="qchips"><button data-act="quickDue" data-n="0">Today</button><button data-act="quickDue" data-n="1">Tomorrow</button>' +
+    '<button data-act="quickScope" data-s="week" class="' + (t.due_scope === 'week' ? 'on' : '') + '">This week</button><button data-act="quickScope" data-s="month" class="' + (t.due_scope === 'month' ? 'on' : '') + '">This month</button>' +
+    (t.due ? '<button data-act="quickDue" data-n="clear">Clear</button>' : '') + '</div>' +
+    (t.due_scope ? '<p class="small muted" style="padding:0 14px 12px 44px">' + (t.due_scope === 'week' ? 'Shows in My Week all week and moves to the top of My Day from Thursday until done.' : 'Shows in My Week and at the top of My Day every day of the month\'s last 7 days until done.') + '</p>' : '') +
     '<div class="frow">' + icon('repeat') + '<span class="grow">Repeat</span><select class="sel" data-tfield="repeat">' + Object.keys(REPEATS).map(k => '<option value="' + k + '"' + ((t.repeat || '') === k ? ' selected' : '') + '>' + REPEATS[k] + '</option>').join('') + '</select></div></div>';
   h += '<div class="card"><div class="frow">' + icon('target') + '<span class="grow">Goal</span><select class="sel" data-tfield="goal_id" style="max-width:62%"><option value="">None</option>' + goalOptions(t.goal_id) + '</select></div>' +
     '<div class="frow">' + icon('list') + '<span class="grow">List</span><select class="sel" data-tfield="list_id"><option value="">Tasks</option>' + S.lists.slice().sort(bySort).map(l => '<option value="' + l.id + '"' + (t.list_id === l.id ? ' selected' : '') + '>' + esc(l.name) + '</option>').join('') + '</select></div></div>';
@@ -1796,11 +2031,23 @@ document.addEventListener('click', e => {
     case 'view': setView(a.dataset.v); break;
     case 'openSide': $('#side').classList.add('open'); $('#sideScrim').classList.add('on'); break;
     case 'closeSide': closeSide(); break;
-    case 'focus': setFocus(id || null); break;
-    case 'centerTap':
-      if (window.innerWidth <= 860) $('#gpanel').classList.add('open');
-      else { const t = $('.ptitle'); if (t) t.focus(); }
-      break;
+    case 'focus': {
+      // a second click right after navigating counts as a double-click: open details
+      if (a.classList.contains('node') && UI.lastNav && Date.now() - UI.lastNav < 420) { UI.lastNav = 0; showPanel(true); break; }
+      setFocus(id || null); if (a.classList.contains('node')) UI.lastNav = Date.now(); break;
+    }
+    case 'openGoalMap': e.stopPropagation(); UI.view = 'goals'; setFocusRaw(id); render(); break;
+    case 'toggleSec': UI.collapsed[id] = !UI.collapsed[id]; try { localStorage.setItem('orbit.collapsed', JSON.stringify(UI.collapsed)); } catch (er) {} renderTasks(); break;
+    case 'ctxDo': ctxDo(a.dataset.do); break;
+    case 'ctxMoveTo': ctxMoveTo(a.dataset.to); break;
+    case 'ctxBack': UI.ctx.screen = 'menu'; renderCtx(); break;
+    case 'closeCtx': closeCtx(); break;
+    case 'askDeleteAll': askDeleteAll(); break;
+    case 'dlgClose': closeDlg(); break;
+    case 'deleteAllGo': if (($('#dlgInput') || {}).value === 'DELETE') { closeDlg(); startFresh(); } break;
+    case 'centerTap': showPanel(true); break;
+    case 'showPanel': showPanel(true); break;
+    case 'hidePanel': e.stopPropagation(); hidePanel(); break;
     case 'sheet': $('#gpanel').classList.toggle('open'); break;
     case 'compose': openAdd(UI.focus); break;
     case 'openAdd': openAdd(UI.focus, a.dataset.t); break;
@@ -1843,9 +2090,11 @@ document.addEventListener('click', e => {
     case 'starTask': { const t = T(id); updateTask(t, { important: !t.important }); render(); break; }
     case 'toMyDay': updateTask(T(id), { my_day: today() }); render(); break;
     case 'toggleDone': UI.showDone[UI.view] = !UI.showDone[UI.view]; render(); break;
+    case 'draftScope': UI.draft.scope = UI.draft.scope === a.dataset.s ? null : a.dataset.s; if (UI.draft.scope) UI.draft.due = null; render(); $('#addInput').focus(); break;
+    case 'quickScope': { const t = T(UI.openTask); const sc = a.dataset.s; updateTask(t, { due_scope: sc, due: sc === 'week' ? endOfWeek() : endOfMonth() }); $('#drawer').dataset.id = ''; render(); toast(sc === 'week' ? 'Due this week. It moves to the top of My Day on Thursday.' : 'Due this month. It shows in My Day and My Week during the last 7 days.'); break; }
     case 'draftStar': UI.draft.important = !UI.draft.important; render(); $('#addInput').focus(); break;
     case 'myDayToggle': { const t = T(UI.openTask); updateTask(t, { my_day: t.my_day === today() ? null : today() }); render(); break; }
-    case 'quickDue': { const t = T(UI.openTask); const n = a.dataset.n; updateTask(t, { due: n === 'clear' ? null : addDays(today(), +n) }); $('#drawer').dataset.id = ''; render(); break; }
+    case 'quickDue': { const t = T(UI.openTask); const n = a.dataset.n; updateTask(t, { due: n === 'clear' ? null : addDays(today(), +n), due_scope: null }); $('#drawer').dataset.id = ''; render(); break; }
     case 'toggleStep': { const t = T(UI.openTask); const s = t.steps.find(x => x.id === a.dataset.sid); s.done = !s.done; updateTask(t, { steps: t.steps.slice() }); $('#drawer').dataset.id = ''; render(); break; }
     case 'delStep': { const t = T(UI.openTask); updateTask(t, { steps: t.steps.filter(x => x.id !== a.dataset.sid) }); $('#drawer').dataset.id = ''; render(); break; }
     case 'delTask': deleteTask(UI.openTask); break;
@@ -1865,20 +2114,205 @@ document.addEventListener('click', e => {
     case 'showPass': { const i = $('#authPass'); const show = i.type === 'password'; i.type = show ? 'text' : 'password'; a.textContent = show ? 'Hide' : 'Show'; break; }
   }
 });
-document.addEventListener('contextmenu', e => {
-  const n = e.target.closest('.node[data-act="bubbleTask"]'); if (!n) return;
-  e.preventDefault(); UI.openTask = n.dataset.id; render();
+/* ---------- drag to reorder rows in My Day / My Week ---------- */
+let rd = null;
+document.addEventListener('pointerdown', e => {
+  const g = e.target.closest('.grip'); if (!g) return;
+  const row = g.closest('.trow'), box = row && row.parentElement;
+  if (!box || !box.classList.contains('dgroup')) return;
+  e.preventDefault(); e.stopPropagation();
+  const rows = Array.from(box.children).filter(r => r.classList.contains('trow'));
+  const scroller = row.closest('.tbody');
+  rd = { row: row, box: box, rows: rows, from: rows.indexOf(row), to: rows.indexOf(row), y0: e.clientY, sc0: scroller ? scroller.scrollTop : 0, scroller: scroller,
+         h: row.getBoundingClientRect().height + 6, mids: rows.map(r => { const b = r.getBoundingClientRect(); return b.top + b.height / 2; }) };
+  row.classList.add('rdrag'); document.body.classList.add('reordering');
+  try { g.setPointerCapture(e.pointerId); } catch (er) {}
+}, true);
+document.addEventListener('pointermove', e => {
+  if (!rd) return;
+  const sc = rd.scroller;
+  if (sc) { const b = sc.getBoundingClientRect(); if (e.clientY < b.top + 50) sc.scrollTop -= 8; else if (e.clientY > b.bottom - 70) sc.scrollTop += 8; }
+  const ds = sc ? sc.scrollTop - rd.sc0 : 0, y = e.clientY + ds;
+  rd.row.style.transform = 'translateY(' + (e.clientY - rd.y0 + ds) + 'px)';
+  let to = 0; rd.mids.forEach((m, i) => { if (i !== rd.from && y > m) to++; });
+  rd.to = to;
+  rd.rows.forEach((r, i) => {
+    if (i === rd.from) return;
+    let shift = 0;
+    if (rd.from < rd.to && i > rd.from && i <= rd.to) shift = -rd.h;
+    if (rd.to < rd.from && i >= rd.to && i < rd.from) shift = rd.h;
+    r.style.transform = shift ? 'translateY(' + shift + 'px)' : '';
+  });
 });
+function endReorder(commit) {
+  if (!rd) return; const d = rd; rd = null;
+  document.body.classList.remove('reordering');
+  justDragged = true; setTimeout(() => { justDragged = false; }, 120);
+  if (commit && d.to !== d.from) {
+    const ids = d.rows.map(r => r.dataset.id); const moved = ids.splice(d.from, 1)[0]; ids.splice(d.to, 0, moved);
+    const ranks = ids.map(id => T(id)).filter(Boolean).map(t => t.rank).filter(r => r != null).map(Number);
+    const base = ranks.length ? Math.min.apply(null, ranks) : 0;
+    ids.forEach((id, i) => { const t = T(id); if (t && t.rank !== base + i) updateTask(t, { rank: base + i }); });
+  }
+  renderTasks();
+}
+document.addEventListener('pointerup', () => endReorder(true));
+document.addEventListener('pointercancel', () => endReorder(false));
+
+/* ---------- panel show / hide ---------- */
+function showPanel(openSheet) {
+  UI.panelOff = false; try { localStorage.setItem('orbit.panelOff', '0'); } catch (er) {}
+  $('#goalsView').classList.remove('panel-off');
+  if (openSheet && window.innerWidth <= 860) $('#gpanel').classList.add('open');
+}
+function hidePanel() {
+  UI.panelOff = true; try { localStorage.setItem('orbit.panelOff', '1'); } catch (er) {}
+  $('#gpanel').classList.remove('open'); $('#goalsView').classList.add('panel-off');
+}
+
+/* ---------- quick menu (right-click / long-press) ---------- */
+UI.ctx = null;
+function ctxTargetOf(el) {
+  if (!el) return null;
+  if (el.classList.contains('node')) {
+    if (el.classList.contains('parent') || el.classList.contains('add') || el.classList.contains('more') || el.classList.contains('leaving')) return null;
+    const k = el.dataset.key;
+    if (k === 'root') return { kind: 'root' };
+    if (el.dataset.act === 'openTask') return { kind: 'task', id: el.dataset.id };
+    if (G(k)) return { kind: 'goal', id: k };
+    return null;
+  }
+  if (el.classList.contains('trow')) return { kind: 'task', id: el.dataset.id };
+  if (el.classList.contains('grow-row') && G(el.dataset.id)) return { kind: 'goal', id: el.dataset.id };
+  if (el.classList.contains('gsec-h') && G(el.dataset.id)) return { kind: 'goal', id: el.dataset.id };
+  return null;
+}
+function openCtx(info, x, y) { UI.ctx = Object.assign({ screen: 'menu', x: x, y: y }, info); renderCtx(); }
+function closeCtx() { UI.ctx = null; renderCtx(); }
+function renderCtx() {
+  const el = $('#ctx'), sc = $('#ctxScrim'), c = UI.ctx;
+  el.classList.toggle('on', !!c); sc.classList.toggle('on', !!c);
+  if (!c) { el.innerHTML = ''; return; }
+  const sheet = window.matchMedia('(max-width: 860px), (pointer: coarse)').matches;
+  el.classList.toggle('sheet', sheet); sc.classList.toggle('dim', sheet);
+  let title = '', items = [], h = '';
+  if (c.kind === 'goal') {
+    const g = G(c.id); if (!g) return closeCtx(); title = g.title;
+    items = [['open', 'Open details', 'note'], ['inside', 'Go inside', 'right'], ['add', 'Add sub-goal or task', 'plus'],
+      [g.done ? 'unachieve' : 'achieve', g.done ? 'Mark not achieved' : 'Mark achieved', 'check'], ['rename', 'Rename', 'pencil'], ['move', 'Move to\u2026', 'layers'], ['delete', 'Delete', 'trash', 'danger']];
+  } else if (c.kind === 'task') {
+    const t = T(c.id); if (!t) return closeCtx(); title = t.title;
+    items = [['open', 'Open details', 'note'], ['toggle', t.done ? 'Mark not done' : 'Mark done', 'check'], ['myday', t.my_day === today() ? 'Remove from My Day' : 'Add to My Day', 'sun'],
+      ['star', t.important ? 'Remove importance' : 'Mark important', 'star'], ['move', 'Move to goal\u2026', 'target'], ['delete', 'Delete', 'trash', 'danger']];
+  } else { title = rootName(); items = [['open', 'Open details', 'note'], ['rename', 'Rename', 'pencil'], ['add', 'Add a goal or task', 'plus']]; }
+  if (c.screen === 'move') {
+    h += '<div class="ctx-title"><button class="iconbtn sm" data-act="ctxBack" aria-label="Back">' + icon('back', 'sm') + '</button><span>Move \u201c' + esc(title) + '\u201d to</span></div>';
+    const cur = c.kind === 'task' ? (T(c.id).goal_id || '') : (G(c.id).parent_id || '');
+    h += '<button class="ctx-item' + (cur === '' ? ' cur' : '') + '" data-act="ctxMoveTo" data-to="">' + icon(c.kind === 'task' ? 'x' : 'target', 'sm') + (c.kind === 'task' ? 'No goal (floats on the map)' : esc(rootName()) + ' (top level)') + '</button>';
+    (function walk(pid, d) {
+      kidsOf(pid).forEach(x => {
+        if (c.kind === 'goal' && x.id === c.id) return;
+        const ok = c.kind === 'task' || canMoveGoal(c.id, x.id);
+        h += '<button class="ctx-item' + (cur === x.id ? ' cur' : '') + '" data-act="ctxMoveTo" data-to="' + x.id + '"' + (ok ? '' : ' disabled') + ' style="padding-left:' + (10 + d * 16) + 'px"><i class="hdot" style="--h:' + hueOf(x) + '"></i>' + esc(x.title) + '</button>';
+        walk(x.id, d + 1);
+      });
+    })(null, 0);
+  } else {
+    h += '<div class="ctx-title"><span>' + esc(title) + '</span></div>' + items.map(i => '<button class="ctx-item ' + (i[3] || '') + '" data-act="ctxDo" data-do="' + i[0] + '">' + icon(i[2], 'sm') + i[1] + '</button>').join('');
+  }
+  if (sheet) h += '<button class="ctx-item cancel" data-act="closeCtx">Cancel</button>';
+  el.innerHTML = h;
+  if (!sheet) {
+    const w = el.offsetWidth, hh = el.offsetHeight;
+    el.style.left = clamp(c.x, 8, window.innerWidth - w - 8) + 'px'; el.style.top = clamp(c.y, 8, window.innerHeight - hh - 8) + 'px';
+  } else { el.style.left = ''; el.style.top = ''; }
+}
+function focusRename(sel) { setTimeout(() => { const t = $(sel); if (t) { t.focus(); t.select(); } }, 350); }
+function ctxDo(action) {
+  const c = UI.ctx; if (!c) return; const id = c.id;
+  if (action === 'move') { c.screen = 'move'; renderCtx(); return; }
+  closeCtx();
+  if (c.kind === 'root') {
+    if (action === 'open') { UI.view = 'goals'; setFocusRaw(null); showPanel(true); render(); }
+    if (action === 'rename') { UI.view = 'goals'; setFocusRaw(null); showPanel(true); render(); focusRename('textarea[data-rootfield="title"]'); }
+    if (action === 'add') openAdd(null);
+    return;
+  }
+  if (c.kind === 'goal') {
+    const g = G(id);
+    if (action === 'open' || action === 'rename') { UI.view = 'goals'; setFocusRaw(id); showPanel(true); render(); if (action === 'rename') focusRename('.ptitle'); }
+    else if (action === 'inside') { UI.view = 'goals'; setFocus(id); render(); }
+    else if (action === 'add') openAdd(id);
+    else if (action === 'achieve' || action === 'unachieve') { updateGoal(g, { done: action === 'achieve' }); render(); if (g.done) toast('"' + g.title + '" achieved'); }
+    else if (action === 'delete') deleteGoal(id);
+    return;
+  }
+  const t = T(id);
+  if (action === 'open') { UI.openTask = id; render(); }
+  else if (action === 'toggle') toggleTask(id);
+  else if (action === 'myday') { updateTask(t, { my_day: t.my_day === today() ? null : today() }); render(); }
+  else if (action === 'star') { updateTask(t, { important: !t.important }); render(); }
+  else if (action === 'delete') deleteTask(id);
+}
+function ctxMoveTo(to) {
+  const c = UI.ctx; if (!c) return; closeCtx(); to = to || null;
+  if (c.kind === 'goal') moveGoal(c.id, to);
+  else { const t = T(c.id), old = t.goal_id || null; if (old !== to) { updateTask(t, { goal_id: to }); toast('Moved "' + t.title + '" ' + (to ? 'into "' + G(to).title + '"' : 'out of its goal'), () => { updateTask(t, { goal_id: old }); render(); }); } }
+  render();
+}
+document.addEventListener('contextmenu', e => {
+  const info = ctxTargetOf(e.target.closest('.node, .trow, .grow-row, .gsec-h')); if (!info) return;
+  e.preventDefault(); if (drag) { drag = null; } openCtx(info, e.clientX, e.clientY);
+});
+let lp = null;
+document.addEventListener('pointerdown', e => {
+  if (e.pointerType === 'mouse' || e.target.closest('.grip')) return;
+  const tgt = e.target.closest('.node, .trow, .grow-row, .gsec-h'); if (!tgt) return;
+  const info = ctxTargetOf(tgt); if (!info) return;
+  if (lp) clearTimeout(lp.t);
+  lp = { x: e.clientX, y: e.clientY };
+  lp.t = setTimeout(() => {
+    if (!lp) return; const at = lp; lp = null;
+    if (drag && drag.moved) return;
+    drag = null; justDragged = true; setTimeout(() => { justDragged = false; }, 450);
+    if (navigator.vibrate) navigator.vibrate(12);
+    openCtx(info, at.x, at.y);
+  }, 500);
+}, true);
+document.addEventListener('pointermove', e => { if (lp && Math.hypot(e.clientX - lp.x, e.clientY - lp.y) > 9) { clearTimeout(lp.t); lp = null; } }, true);
+['pointerup', 'pointercancel'].forEach(ev => document.addEventListener(ev, () => { if (lp) { clearTimeout(lp.t); lp = null; } }, true));
+window.addEventListener('resize', () => { if (UI.ctx) closeCtx(); });
+
+/* ---------- settings page ---------- */
+function renderSettings() {
+  $('#setHead').innerHTML = '<button class="iconbtn menu-btn" data-act="openSide" aria-label="Open menu">' + icon('menu') + '</button><div class="tt"><div class="h1">Settings</div></div>';
+  const email = Store.live && Store.user ? Store.user.email : '';
+  let h = '<div class="set-card"><h3>Account</h3>' +
+    (email ? '<p class="small muted">Signed in as <b style="color:var(--text)">' + esc(email) + '</b>. Everything saves to your account and syncs across devices.</p><div class="row"><button class="btn ghost" data-act="logout">' + icon('logout', 'sm') + 'Sign out</button></div>'
+           : '<p class="small muted">Not signed in. Data is stored only in this browser until the app is connected to your account.</p>') + '</div>';
+  h += '<div class="set-card"><h3>Main bubble</h3><p class="small muted">The name in the center of your goal map.</p><input class="txt" data-rootfield="title" value="' + esc(rootName()) + '" aria-label="Main bubble name"></div>';
+  h += '<div class="set-card"><h3>Backup</h3><p class="small muted">Download a file with every goal, task and list. Restoring adds items back and never deletes what you have.</p><div class="row"><button class="btn ghost" data-act="exportData">' + icon('download', 'sm') + 'Download backup</button><button class="btn ghost" data-act="importData">' + icon('upload', 'sm') + 'Restore from file</button></div></div>';
+  h += '<div class="set-card danger"><h3>Start fresh</h3><p class="small muted">Deletes all ' + S.goals.length + ' goals, ' + S.tasks.length + ' tasks and ' + S.lists.length + ' lists from your account. A backup downloads first.</p><div class="row"><button class="btn danger" data-act="askDeleteAll">' + icon('trash', 'sm') + 'Delete everything\u2026</button></div></div>';
+  $('#setBody').innerHTML = h;
+}
+function askDeleteAll() {
+  $('#dlg').innerHTML = '<h3>Delete everything?</h3><p class="small muted">This removes all ' + S.goals.length + ' goals, ' + S.tasks.length + ' tasks and ' + S.lists.length + ' lists on every device. A backup file downloads first.</p>' +
+    '<label class="small muted" for="dlgInput">Type <b style="color:var(--text)">DELETE</b> to confirm</label><input id="dlgInput" autocomplete="off" autocapitalize="characters" spellcheck="false">' +
+    '<div class="row"><button class="btn ghost" data-act="dlgClose">Cancel</button><button class="btn dangerfill" id="dlgGo" data-act="deleteAllGo" disabled>Delete everything</button></div>';
+  $('#dlg').classList.add('on'); $('#dlgScrim').classList.add('on'); setTimeout(() => $('#dlgInput').focus(), 50);
+}
+function closeDlg() { $('#dlg').classList.remove('on'); $('#dlgScrim').classList.remove('on'); }
 document.addEventListener('mouseover', e => {
   const n = e.target.closest('.node'); $$('#links .hot').forEach(l => l.classList.remove('hot'));
   if (n) { const l = $('#links line[data-key="' + (window.CSS && CSS.escape ? CSS.escape(n.dataset.key) : n.dataset.key) + '"]'); if (l) l.classList.add('hot'); }
 });
 document.addEventListener('input', e => {
   const el = e.target;
+  if (el.id === 'dlgInput') { $('#dlgGo').disabled = el.value.trim() !== 'DELETE'; return; }
   if (el.id === 'addSheetInput' && UI.add) { const pos = el.selectionStart; UI.add.q = el.value; renderAddSheet(); const i = $('#addSheetInput'); i.focus(); i.setSelectionRange(pos, pos); return; }
-  if (el.id === 'search') { UI.q = el.value.trim(); if (UI.q && UI.view === 'goals') UI.view = 'all'; UI.openTask = null; render(); $('#search').focus(); return; }
+  if (el.id === 'search') { UI.q = el.value.trim(); if (UI.q && (UI.view === 'goals' || UI.view === 'settings')) UI.view = 'all'; UI.openTask = null; render(); $('#search').focus(); return; }
   if (el.dataset.rootfield) {
-    if (el.dataset.rootfield === 'title') { autosize(el); PROFILE.title = el.value; renderLight(); } else PROFILE.note = el.value;
+    if (el.dataset.rootfield === 'title') { if (el.tagName === 'TEXTAREA') autosize(el); PROFILE.title = el.value; renderLight(); } else PROFILE.note = el.value;
     saveProfile(); return;
   }
   if (el.dataset.gfield) {
@@ -1913,11 +2347,11 @@ document.addEventListener('change', e => {
   if (el.dataset.gfield === 'metric_unit') { updateGoal(G(UI.focus), { metric_unit: el.value.trim() || null }); render(); return; }
   if (el.dataset.gfield === 'title' && !el.value.trim()) { el.value = 'Untitled'; updateGoal(G(UI.focus), { title: 'Untitled' }); render(); return; }
   if (el.dataset.tfield && el.tagName !== 'TEXTAREA') {
-    const t = T(UI.openTask); const f = el.dataset.tfield; updateTask(t, { [f]: el.value || null });
+    const t = T(UI.openTask); const f = el.dataset.tfield; const patch = { [f]: el.value || null }; if (f === 'due') patch.due_scope = null; updateTask(t, patch);
     $('#drawer').dataset.id = ''; render(); return;
   }
   if (el.dataset.actChange === 'sort') { UI.sorts[UI.view] = el.value; renderTasks(); return; }
-  if (el.id === 'draftDue') { UI.draft.due = el.value || null; render(); $('#addInput').focus(); return; }
+  if (el.id === 'draftDue') { UI.draft.due = el.value || null; UI.draft.scope = null; render(); $('#addInput').focus(); return; }
   if (el.id === 'draftGoal') { UI.draft.goal = el.value; render(); $('#addInput').focus(); return; }
 });
 document.addEventListener('keydown', e => {
@@ -1927,6 +2361,9 @@ document.addEventListener('keydown', e => {
     if (el.id === 'addInput') { e.preventDefault(); addFromBar(); return; }
     if (el.id === 'composerInput') { e.preventDefault(); composerSubmit(); return; }
     if (el.id === 'addSheetInput') { e.preventDefault(); addSheetSubmit(); return; }
+    if (el.id === 'dlgInput') { e.preventDefault(); if (el.value.trim() === 'DELETE') { closeDlg(); startFresh(); } return; }
+    if (el.dataset.addtaskGoal && el.value.trim()) { const gid = el.dataset.addtaskGoal; addTask({ goal_id: gid, title: el.value.trim() }); el.value = ''; renderTasks(); renderSide(); const i = $('[data-addtask-goal="' + gid + '"]'); if (i) i.focus(); return; }
+    if (el.classList.contains('gsec-h')) { el.click(); return; }
     if (el.id === 'newList' && el.value.trim()) {
       const l = { id: uid(), name: el.value.trim(), sort: S.lists.length + 1, created_at: nowIso() }; S.lists.push(l); Store.save('lists', l); el.value = ''; el.blur(); setView('list:' + l.id); return;
     }
@@ -1941,6 +2378,8 @@ document.addEventListener('keydown', e => {
   }
   if (e.key === 'Escape') {
     if (el.id === 'renameInput') { UI.renaming = false; renderTasks(); return; }
+    if (UI.ctx) { closeCtx(); return; }
+    if ($('#dlg').classList.contains('on')) { closeDlg(); return; }
     if (UI.add) { closeAdd(); return; }
     if (UI.composer) { UI.composer = null; removeComposer(); return; }
     if (UI.openTask) { UI.openTask = null; render(); return; }
@@ -1981,7 +2420,7 @@ function dropTargetAt(x, y, d) {
 $('#stage').addEventListener('pointerdown', e => {
   if (e.button !== 0) return;
   const n = e.target.closest('.node.orbit'); if (!n) return;
-  const kind = n.dataset.act === 'focus' ? 'goal' : n.dataset.act === 'bubbleTask' ? 'task' : null; if (!kind) return;
+  const kind = n.dataset.act === 'focus' ? 'goal' : n.dataset.act === 'openTask' ? 'task' : null; if (!kind) return;
   drag = { el: n, kind: kind, id: n.dataset.id, sx: e.clientX, sy: e.clientY, moved: false };
 });
 window.addEventListener('pointermove', e => {
@@ -2107,7 +2546,6 @@ async function importData(file) {
 function startFresh() {
   const n = S.goals.length + S.tasks.length + S.lists.length;
   if (!n) { toast('Already empty'); return; }
-  if (!confirm('Delete every goal, task and list (' + S.goals.length + ' goals, ' + S.tasks.length + ' tasks)?\n\nA backup file downloads first, so you can restore it with the upload button if you change your mind.')) return;
   exportData();
   S = { goals: [], lists: [], tasks: [] }; UI.focus = null; UI.openTask = null;
   if (Store.live) ['tasks', 'lists', 'goals'].forEach(tb => Store.enqueue(() => Store.sb.from(tb).delete().not('id', 'is', null)));
