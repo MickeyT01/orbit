@@ -2235,6 +2235,9 @@ document.addEventListener('click', e => {
     case 'closeCtx': closeCtx(); break;
     case 'askDeleteAll': askDeleteAll(); break;
     case 'dlgClose': closeDlg(); break;
+    case 'localImport': localImport(); break;
+    case 'localImportAsk': offerLocalImport(); break;
+    case 'localSkip': closeDlg(); toast('You can bring it in later from Settings.'); break;
     case 'deleteAllGo': if (($('#dlgInput') || {}).value === 'DELETE') { closeDlg(); startFresh(); } break;
     case 'centerTap': showPanel(true); break;
     case 'showPanel': showPanel(true); break;
@@ -2503,6 +2506,8 @@ function renderSettings() {
     (email ? '<p class="small muted">Signed in as <b style="color:var(--text)">' + esc(email) + '</b>. Everything saves to your account and syncs across devices.</p><div class="row"><button class="btn ghost" data-act="logout">' + icon('logout', 'sm') + 'Sign out</button></div>'
            : '<p class="small muted">Not signed in. Data is stored only in this browser until the app is connected to your account.</p>') + '</div>';
   h += '<div class="set-card"><h3>Main bubble</h3><p class="small muted">The name in the center of your goal map.</p><input class="txt" data-rootfield="title" value="' + esc(rootName()) + '" aria-label="Main bubble name"></div>';
+  let hasLocal = false; try { const d = JSON.parse(localStorage.getItem(LS_KEY) || 'null'); hasLocal = !!(Store.live && d && ((d.goals || []).length + (d.tasks || []).length)); } catch (e) {}
+  if (hasLocal) h += '<div class="set-card"><h3>Data saved in this browser</h3><p class="small muted">You have goals or tasks from before you signed in. Move them into your account so they sync.</p><div class="row"><button class="btn" data-act="localImportAsk">Move into my account</button></div></div>';
   h += '<div class="set-card"><h3>Backup</h3><p class="small muted">Download a file with every goal, task and list. Restoring adds items back and never deletes what you have.</p><div class="row"><button class="btn ghost" data-act="exportData">' + icon('download', 'sm') + 'Download backup</button><button class="btn ghost" data-act="importData">' + icon('upload', 'sm') + 'Restore from file</button></div></div>';
   h += '<div class="set-card danger"><h3>Start fresh</h3><p class="small muted">Deletes all ' + S.goals.length + ' goals, ' + S.tasks.length + ' tasks and ' + S.lists.length + ' lists from your account. A backup downloads first.</p><div class="row"><button class="btn danger" data-act="askDeleteAll">' + icon('trash', 'sm') + 'Delete everything\u2026</button></div></div>';
   $('#setBody').innerHTML = h;
@@ -2731,8 +2736,44 @@ function startApp() { hydrateIcons(document); loadProfile(); render(); }
 let started = false;
 async function startLive() {
   $('#auth').classList.remove('on'); $('#logoutBtn').hidden = false; setSync('saving');
-  try { await Store.loadRemote(); setSync('ok'); } catch (err) { setSync('error', err.message); }
+  try { await Store.loadRemote(); setSync('ok'); } catch (err) { setSync('error', err.message); toast('Could not load your data: ' + err.message); }
   startApp();
+  offerLocalImport();
+}
+/* Data created before the account was connected lives in this browser. Offer to move it in. */
+function offerLocalImport() {
+  let d = null;
+  try { d = JSON.parse(localStorage.getItem(LS_KEY) || 'null'); } catch (e) {}
+  if (!d || !((d.goals || []).length + (d.tasks || []).length)) return;
+  const ng = (d.goals || []).length, nt = (d.tasks || []).length, nl = (d.lists || []).length;
+  $('#dlg').innerHTML = '<h3>Bring your data into your account?</h3><p class="small muted">This browser has ' + ng + ' goal' + (ng === 1 ? '' : 's') + ', ' + nt + ' task' + (nt === 1 ? '' : 's') + (nl ? ' and ' + nl + ' list' + (nl === 1 ? '' : 's') : '') +
+    ' saved from before you signed in. Move them into your account so they sync to every device?</p>' +
+    '<div class="row"><button class="btn ghost" data-act="localSkip">Not now</button><button class="btn" data-act="localImport">Move into my account</button></div>';
+  $('#dlg').classList.add('on'); $('#dlgScrim').classList.add('on');
+}
+function localImport() {
+  let d = null; try { d = JSON.parse(localStorage.getItem(LS_KEY) || 'null'); } catch (e) {}
+  closeDlg(); if (!d) return;
+  const merge = (arr, rows, table) => rows.forEach(r => { if (arr.some(x => x.id === r.id)) return; arr.push(r); Store.save(table, r); });
+  merge(S.lists, d.lists || [], 'lists');
+  merge(S.goals, (d.goals || []).slice().sort((a, b) => a.tier - b.tier), 'goals');
+  merge(S.tasks, (d.tasks || []).map(t => Object.assign({ steps: [] }, t)), 'tasks');
+  Store.q.then(() => {
+    if (Store.pending === 0 && !$('#sync').classList.contains('error')) {
+      try { localStorage.setItem(LS_KEY + '.moved', localStorage.getItem(LS_KEY)); localStorage.removeItem(LS_KEY); } catch (e) {}
+      toast('Moved into your account. It now syncs everywhere.');
+    } else toast('Some items did not save. Check the sync pill, then try again from Settings.');
+  });
+  render();
+}
+/* On the live site, never fall back to browser storage silently: explain what is missing. */
+function showSetupProblem(msg) {
+  hydrateIcons(document);
+  const a = $('#auth'); a.classList.add('on');
+  $('.box', a).innerHTML = '<div class="brand">ORBIT</div><h3 style="font-size:17px">Not connected to your account yet</h3>' +
+    '<p class="small muted" style="line-height:1.6">' + msg + '</p>' +
+    '<p class="small muted" style="line-height:1.6">Your data is safe. Nothing is saved until this is fixed, so no work goes to the wrong place.</p>' +
+    '<button class="btn ghost" onclick="location.reload()">Reload after fixing</button>';
 }
 function authMsg(text, info) { const e = $('#authErr'); e.textContent = text || ''; e.classList.toggle('info', !!info); }
 function showAuth(mode) {
@@ -2800,9 +2841,22 @@ async function sendReset() {
   authMsg(r.error ? r.error.message : 'Reset link sent. Open it on this device to set a new password.', !r.error);
 }
 (async function boot() {
-  const configured = /^https:\/\//.test(SUPABASE_URL) && SUPABASE_ANON_KEY.indexOf('YOUR_') !== 0 && SUPABASE_ANON_KEY.indexOf('PASTE') !== 0;
-  const live = configured && /github\.io$/.test(location.hostname) && window.supabase;
+  const onSite = /github\.io$/.test(location.hostname);
+  const hasUrl = /^https:\/\/[a-z0-9-]+\.supabase\.co\/?$/i.test(SUPABASE_URL.trim());
+  const key = String(SUPABASE_ANON_KEY).trim();
+  const hasKey = /^eyJ/.test(key) || /^sb_publishable_/.test(key);
+  if (onSite) {
+    let problem = '';
+    if (!window.ORBIT_CONFIG) problem = 'The app cannot find <b>config.js</b>. In your GitHub repo, make sure there is a file named exactly <b>config.js</b> (all lowercase) sitting next to index.html, not inside a folder.';
+    else if (!hasUrl) problem = 'config.js is there, but the <b>url</b> is not a Supabase project URL. It should look like <b>https://abcdefgh.supabase.co</b> with nothing after .co. It currently says: <b>' + esc(SUPABASE_URL) + '</b>';
+    else if (/^sb_secret_/.test(key) || /service_role/.test(key)) problem = 'config.js has your <b>secret</b> key. Replace it right away with the <b>anon public</b> (or publishable) key from Supabase, then rotate the secret key in Supabase settings.';
+    else if (!hasKey) problem = 'config.js is there, but the <b>anonKey</b> does not look right. It should be the long <b>anon public</b> key starting with <b>eyJ</b>, or a publishable key starting with <b>sb_publishable_</b>.';
+    else if (!window.supabase) problem = 'The sign-in library did not load. Check your internet connection or turn off any content blocker for this site, then reload.';
+    if (problem) { showSetupProblem(problem); return; }
+  }
+  const live = onSite && hasUrl && hasKey && window.supabase;
   if (live) {
+    SUPABASE_URL = SUPABASE_URL.trim().replace(/\/$/, ''); SUPABASE_ANON_KEY = key;
     Store.live = true; Store.sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
     hydrateIcons(document);
     Store.recovering = /type=recovery/.test(location.hash);
