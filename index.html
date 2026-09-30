@@ -433,7 +433,8 @@ input,textarea,select{font:inherit;color:inherit}
 .addbtn{height:28px;padding:0 12px;border-radius:7px;background:var(--surface-3);border:1px solid var(--line-2);font-size:12px;font-weight:600;color:var(--text);flex:none;display:none}
 .addrow:focus-within .addbtn{display:inline-flex;align-items:center}
 .trow{border-left:3px solid var(--rh,#3a4556)}
-.seg-row{margin:2px 0 4px}
+.seg-row{margin:2px 0 8px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+#tasksView .thead,#settingsView .thead{max-width:924px}
 .seg-row .seg{margin:0}
 .fgroup{margin:14px 0 4px}
 .fgroup-h{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700;color:var(--text);margin:0 0 8px 2px}
@@ -442,6 +443,15 @@ input,textarea,select{font:inherit;color:inherit}
 #dragHint.on{opacity:1;transform:none}
 .node.dragging{will-change:transform}
 .node.dragging .body{transform:scale(1.06)}
+
+.btn-row{display:flex;gap:8px;flex-wrap:wrap}
+.btn-row .btn{flex:1 1 auto}
+.node.selected .body{box-shadow:0 0 0 3px var(--bg),0 0 0 5px var(--blue-2),0 10px 40px -10px var(--h)!important}
+/* hidden goals: a greyed version of the goal color */
+.node.ghidden .body{filter:grayscale(.85) brightness(.75);opacity:.6;border-style:dashed!important}
+.node.ghidden .ring .val{stroke:#6b7686;filter:none}
+.trow.ghidden,.gsec.ghidden>.gsec-h,.grow-row.ghidden{opacity:.5;filter:grayscale(.8)}
+.seg-row .tools{display:flex;gap:6px;flex-wrap:wrap}
 
 /* ============ TOAST / AUTH / MOBILE NAV ============ */
 .toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom));transform:translate(-50%,20px);opacity:0;pointer-events:none;
@@ -508,8 +518,10 @@ input,textarea,select{font:inherit;color:inherit}
   .toast{bottom:calc(92px + env(safe-area-inset-bottom))}
   .step .x{opacity:1}
   .grip{opacity:.8;width:26px}
-  .stage-tools{left:12px;right:auto;bottom:10px}
+  .stage-tools{left:12px;right:12px;bottom:10px;flex-wrap:wrap}
+  .stage-tools button{height:30px;padding:0 10px;font-size:11.5px}
   .addbtn{display:inline-flex;align-items:center}
+  #tasksView .thead,#settingsView .thead{max-width:none}
   #rsBar{font-size:11.5px;padding-left:10px}
   .addsheet{left:0;right:0;top:auto;bottom:0;width:100%;max-height:88vh;transform:translateY(100%);border-radius:18px 18px 0 0;padding-bottom:env(safe-area-inset-bottom)}
   .addsheet.on{transform:none}
@@ -551,7 +563,7 @@ input,textarea,select{font:inherit;color:inherit}
           <div class="crumbs" id="crumbs"></div>
         </div>
         <div class="stage" id="stage" tabindex="-1" aria-label="Goal map">
-          <div class="stage-tools"><button id="doneMapBtn" data-act="toggleDoneMap"></button><button id="resetLayoutBtn" data-act="resetLayout"><svg class="ic sm" data-i="undo"></svg>Reset layout</button></div>
+          <div class="stage-tools"><button id="hiddenMapBtn" data-act="toggleHidden"></button><button id="doneMapBtn" data-act="toggleDoneMap"></button><button id="freezeBtn" data-act="freezeLayout"><svg class="ic sm" data-i="lock"></svg>Freeze layout</button><button id="resetLayoutBtn" data-act="resetLayout"><svg class="ic sm" data-i="undo"></svg>Reset layout</button></div>
           <button class="panel-fab" data-act="showPanel"><svg class="ic sm" data-i="panel"></svg>Details</button>
           <svg id="links"></svg>
           <div id="nodes"></div>
@@ -657,6 +669,8 @@ const IC = {
   resize: '<path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>',
   eye: '<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',
   undo: '<path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-15-6.7L3 13"/>',
+  lock: '<rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>',
+  eyeoff: '<path d="M3 3l18 18M10.6 5.1A10 10 0 0 1 12 5c6.5 0 10 7 10 7a17 17 0 0 1-3.2 4.2M6.6 6.6C3.8 8.4 2 12 2 12s3.5 7 10 7a9.7 9.7 0 0 0 5.4-1.6M9.9 9.9a3 3 0 0 0 4.2 4.2"/>',
   flag: '<path d="M4 22V4a1 1 0 0 1 1-1h11l-2 4 2 4H5"/>',
   grip: '<circle cx="9" cy="6" r="1.3" fill="currentColor" stroke="none"/><circle cx="15" cy="6" r="1.3" fill="currentColor" stroke="none"/><circle cx="9" cy="12" r="1.3" fill="currentColor" stroke="none"/><circle cx="15" cy="12" r="1.3" fill="currentColor" stroke="none"/><circle cx="9" cy="18" r="1.3" fill="currentColor" stroke="none"/><circle cx="15" cy="18" r="1.3" fill="currentColor" stroke="none"/>',
   steps: '<path d="M9 6h11M9 12h11M9 18h11"/><path d="M4 6l1 1 2-2M4 12l1 1 2-2M4 18l1 1 2-2"/>'
@@ -692,7 +706,7 @@ function firstOccurrence(r) {
 
 /* ---------------- state ---------------- */
 let S = { goals: [], lists: [], tasks: [] };
-const UI = { allMode: (function () { try { return localStorage.getItem('orbit.allMode') || 'tree'; } catch (e) { return 'tree'; } })(), showDoneMap: (function () { try { return localStorage.getItem('orbit.showDoneMap') === '1'; } catch (e) { return false; } })(), expanded: (function () { try { return JSON.parse(localStorage.getItem('orbit.expanded') || '{}'); } catch (e) { return {}; } })(), pickDate: false, panelOff: (function () { try { return localStorage.getItem('orbit.panelOff') === '1'; } catch (e) { return false; } })(), collapsed: (function () { try { return JSON.parse(localStorage.getItem('orbit.collapsed') || '{}'); } catch (e) { return {}; } })(), lastNav: 0, view: 'goals', focus: null, prevFocusKey: null, q: '', openTask: null, sorts: {}, showDone: {}, composer: null, burst: null, renaming: false, draft: { due: null, important: false, goal: '' } };
+const UI = { sel: null, showHidden: (function () { try { return localStorage.getItem('orbit.showHidden') === '1'; } catch (e) { return false; } })(), allMode: (function () { try { return localStorage.getItem('orbit.allMode') || 'tree'; } catch (e) { return 'tree'; } })(), showDoneMap: (function () { try { return localStorage.getItem('orbit.showDoneMap') === '1'; } catch (e) { return false; } })(), expanded: (function () { try { return JSON.parse(localStorage.getItem('orbit.expanded') || '{}'); } catch (e) { return {}; } })(), pickDate: false, panelOff: (function () { try { return localStorage.getItem('orbit.panelOff') === '1'; } catch (e) { return false; } })(), collapsed: (function () { try { return JSON.parse(localStorage.getItem('orbit.collapsed') || '{}'); } catch (e) { return {}; } })(), lastNav: 0, view: 'goals', focus: null, prevFocusKey: null, q: '', openTask: null, sorts: {}, showDone: {}, composer: null, burst: null, renaming: false, draft: { due: null, important: false, goal: '' } };
 
 /* ---------------- storage (dual mode) ---------------- */
 const LS_KEY = 'orbit.v1';
@@ -746,9 +760,9 @@ const PROFILE = { title: 'Your life', note: '' };
 const rootName = () => (PROFILE.title || '').trim() || 'Your life';
 function loadProfile() {
   let d = null;
-  if (Store.live && Store.user) { const md = Store.user.user_metadata || {}; d = { title: md.orbit_title, note: md.orbit_note }; }
+  if (Store.live && Store.user) { const md = Store.user.user_metadata || {}; d = { title: md.orbit_title, note: md.orbit_note, addPos: md.orbit_add }; }
   else { try { d = JSON.parse(localStorage.getItem('orbit.profile') || 'null'); } catch (e) {} }
-  if (d) { if (d.title) PROFILE.title = d.title; if (d.note) PROFILE.note = d.note; }
+  if (d) { if (d.title) PROFILE.title = d.title; if (d.note) PROFILE.note = d.note; if (d.addPos) PROFILE.addPos = d.addPos; }
 }
 let profileTimer;
 function saveProfile() {
@@ -756,7 +770,7 @@ function saveProfile() {
   profileTimer = setTimeout(async () => {
     if (!Store.live) { try { localStorage.setItem('orbit.profile', JSON.stringify(PROFILE)); } catch (e) {} return; }
     setSync('saving');
-    const r = await Store.sb.auth.updateUser({ data: { orbit_title: PROFILE.title, orbit_note: PROFILE.note } });
+    const r = await Store.sb.auth.updateUser({ data: { orbit_title: PROFILE.title, orbit_note: PROFILE.note, orbit_add: PROFILE.addPos || null } });
     setSync(r.error ? 'error' : 'ok', r.error && r.error.message);
   }, 600);
 }
@@ -794,7 +808,7 @@ function measure(id) {
   else if (g && +g.metric_target > 0) m = { p: clamp((+g.metric_current || 0) / +g.metric_target, 0, 1), how: 'metric' };
   else {
     const kids = kidsOf(id), all = id ? tasksOf(id) : [], ts = all.filter(t => !t.repeat);
-    const parts = kids.map(k => measure(k.id).p || 0).concat(ts.map(taskCredit));
+    const parts = kids.filter(k => !(k.layout && k.layout.h)).map(k => measure(k.id).p || 0).concat(ts.map(taskCredit));
     m = parts.length ? { p: parts.reduce((a, b) => a + b, 0) / parts.length, how: 'rollup', goals: kids.length, tasks: ts.length, repeats: all.length - ts.length }
                      : { p: null, how: 'none', repeats: all.length };
   }
@@ -838,6 +852,22 @@ function canMoveGoal(id, np) {
   if (np && descIds(id).indexOf(np) > -1) return false;
   return (np ? G(np).tier : 0) + subtreeHeight(id) <= MAX_DEPTH;
 }
+const PG = () => (UI.sel && G(UI.sel) ? UI.sel : UI.focus);
+/* hidden goals: stored as layout.h; hiding a goal hides everything inside it */
+function goalHidden(g) { let n = 0; while (g && n++ < 8) { if (g.layout && g.layout.h) return true; g = g.parent_id ? G(g.parent_id) : null; } return false; }
+const taskHidden = t => !!(t.goal_id && G(t.goal_id) && goalHidden(G(t.goal_id)));
+const showG = g => UI.showHidden || !goalHidden(g);
+const showT = t => UI.showHidden || !taskHidden(t);
+function setHidden(id, val) {
+  const g = G(id); if (!g) return;
+  setLayout('goal', id, { h: val ? 1 : null });
+  if (val && !UI.showHidden) {
+    if (UI.sel && (UI.sel === id || descIds(id).indexOf(UI.sel) > -1)) UI.sel = null;
+    if (UI.focus && descIds(id).indexOf(UI.focus) > -1) setFocusRaw(g.parent_id || null);
+  }
+  render();
+  toast(val ? '\u201c' + g.title + '\u201d is hidden with everything inside it. Use Show hidden to see it.' : '\u201c' + g.title + '\u201d is visible again', true);
+}
 function setLayout(kind, id, patch) {
   const e = kind === 'goal' ? G(id) : T(id); if (!e) return;
   const Lx = Object.assign({}, e.layout || {}, patch);
@@ -850,7 +880,7 @@ function moveGoal(id, np, silent) {
   const old = g.parent_id || null; if (old === np) return true;
   if (!canMoveGoal(id, np)) { toast(np && descIds(id).indexOf(np) > -1 ? 'A goal cannot go inside its own sub-goal' : 'That would go deeper than 6 levels'); return false; }
   const sibs = kidsOf(np);
-  g.parent_id = np; g.layout = null; g.sort = (sibs.length ? Math.max.apply(null, sibs.map(x => x.sort || 0)) : 0) + 1;
+  g.parent_id = np; if (g.layout) { const Lx = Object.assign({}, g.layout); delete Lx.x; delete Lx.y; g.layout = Object.keys(Lx).length ? Lx : null; } g.sort = (sibs.length ? Math.max.apply(null, sibs.map(x => x.sort || 0)) : 0) + 1;
   if (!np && !g.color) g.color = nextColor();
   (function fix(gid, tier) { const x = G(gid); x.tier = tier; Store.save('goals', x); kidsOf(gid).forEach(c => fix(c.id, tier + 1)); })(id, np ? G(np).tier + 1 : 1);
   if (!silent) toast('Moved "' + g.title + '" into ' + (np ? '"' + G(np).title + '"' : rootName()), () => { moveGoal(id, old, true); render(); });
@@ -885,6 +915,7 @@ function deleteGoal(id, confirmed) {
     $('#dlg').classList.add('on'); $('#dlgScrim').classList.add('on'); return;
   }
   if (ids.indexOf(UI.focus) >= 0) setFocusRaw(g.parent_id || null);
+  if (UI.sel && ids.indexOf(UI.sel) >= 0) UI.sel = null;
   if (UI.openTask && tks.some(t => t.id === UI.openTask)) UI.openTask = null;
   tks.forEach(t => Store.del('tasks', t.id));
   S.tasks = S.tasks.filter(t => ids.indexOf(t.goal_id) < 0);
@@ -1094,7 +1125,7 @@ const SMART = [
   { v: 'all', name: 'All tasks', ic: 'layers', c: 'c-link', f: () => true }
 ];
 function viewFilter(v) { const s = SMART.find(x => x.v === v); if (s) return s.f; const id = v.slice(5); return t => t.list_id === id; }
-function openCount(v) { const f = viewFilter(v); return S.tasks.filter(t => !t.done && f(t)).length; }
+function openCount(v) { const f = viewFilter(v); return S.tasks.filter(t => !t.done && showT(t) && f(t)).length; }
 function renderSide() {
   let h = '<button class="nav-item ' + (UI.view === 'goals' ? 'on' : '') + '" data-act="view" data-v="goals">' + icon('target', 'c-goals') + '<span class="name">Goals</span><span class="count">' + kidsOf(null).length + '</span></button><div class="nav-sep"></div>';
   SMART.forEach(s => {
@@ -1188,6 +1219,14 @@ function fitFontAt(title, fonts, wt, extraH, r) {
   for (const px of all) if (lineCount(title, px, wt, r * 1.3) * px * 1.2 + extraH <= r * 1.28) return px;
   return 7;
 }
+function addPos() {
+  if (UI.focus) { const g = G(UI.focus), L = g && g.layout; return L && typeof L.ax === 'number' ? { x: L.ax, y: L.ay } : null; }
+  return PROFILE.addPos && typeof PROFILE.addPos.x === 'number' ? PROFILE.addPos : null;
+}
+function setAddPos(pos) {
+  if (UI.focus) setLayout('goal', UI.focus, { ax: pos ? pos.x : null, ay: pos ? pos.y : null });
+  else { commitSnapshot(); PROFILE.addPos = pos; saveProfile(); }
+}
 function computeLayout() {
   const stage = $('#stage');
   const W = stage.clientWidth, H = stage.clientHeight, small = W < 640;
@@ -1205,7 +1244,7 @@ function computeLayout() {
   const goalBase = clamp(m * GOAL_SIZE[Math.min(depth + 1, 6)], small ? 34 : 38, 76);
   const taskBase = clamp(m * 0.052, small ? 30 : 24, 34);
   const gFonts = small ? [11.5, 10.5, 9.5] : [12.5, 11.5, 10.5], tFonts = [10.5, 9.5, 9];
-  const goals = kidsOf(f).filter(g => showDone || !g.done).map(g => {
+  const goals = kidsOf(f).filter(g => (showDone || !g.done) && showG(g)).map(g => {
     const mz = measure(g.id), hasVal = g.done || mz.p !== null, extraH = hasVal ? 16 : 0;
     const ft = fitText(g.title, gFonts, 600, extraH, goalBase, goalBase * 1.8);
     return { key: g.id, id: g.id, kind: 'goal', role: 'orbit', r: ft.r, fs: ft.fs, ent: g, title: g.title, fonts: gFonts, wt: 600, extraH: extraH };
@@ -1222,6 +1261,7 @@ function computeLayout() {
   const autoT = tl.filter(x => !lay(x).s), tMaxA = autoT.length ? Math.max.apply(null, autoT.map(x => x.r)) : 0;
   goals.forEach(g => { if (!lay(g).s && g.r < tMaxA + 4) g.r = tMaxA + 4; }); // tasks smallest by default
   const add = { key: 'add:' + (f || 'root'), kind: 'add', role: 'orbit', r: Math.max(taskBase, goalBase * 0.72) };
+  const ap = addPos(); if (ap) add.pin = ap;
   const orbit = goals.concat(tl, [add]);
   // the bubble you are inside is always at least ~1.45x its biggest child (children stay under 70%)
   const autoMax = Math.max.apply(null, orbit.filter(x => !lay(x).s).map(x => x.r).concat([0]));
@@ -1229,7 +1269,7 @@ function computeLayout() {
   orbit.forEach(it => {
     const L = lay(it);
     if (L.s) { it.r = clamp(+L.s, 0.18, 0.69) * R0; it.fs = fitFontAt(it.title, it.fonts, it.wt, it.extraH, it.r); it.user = true; }
-    if (typeof L.x === 'number' && typeof L.y === 'number') it.pin = L;
+    if (it.ent && typeof L.x === 'number' && typeof L.y === 'number') it.pin = L;
   });
   const ringItems = orbit.filter(x => !x.pin);
   const rg = ringItems.filter(x => x.kind === 'goal' || x.kind === 'add'), rt = ringItems.filter(x => x.kind === 'task' || x.kind === 'more');
@@ -1259,6 +1299,7 @@ function computeLayout() {
     if (it.pin) { it.x = cx + it.pin.x * AX; it.y = cy + it.pin.y * AY; }
     else { it.x = cx + it.x * sc; it.y = cy + it.y * sc; }
     it.r *= sc; if (it.fs) it.fs *= sc;
+    if (it.pin) { it.x = clamp(it.x, it.r + 4, W - it.r - 4); it.y = clamp(it.y, it.r + 4, H - it.r - 4); }
   });
   rings.forEach(r => { r.rx *= sc; r.ry *= sc; });
   const fixed = [center].concat(orbit.filter(x => x.pin)), movable = orbit.filter(x => !x.pin);
@@ -1306,7 +1347,7 @@ function nodeInfo(it) {
     else { inner = icon('up'); ext = rootName(); act = 'focus'; label = 'Back to ' + rootName(); }
   } else if (it.kind === 'goal') {
     const g = G(it.id), mz = measure(g.id), ms = mz.p !== null;
-    cls += ' t' + Math.min(g.tier, 3) + (g.done ? ' achieved' : '');
+    cls += ' t' + Math.min(g.tier, 3) + (g.done ? ' achieved' : '') + (goalHidden(g) ? ' ghidden' : '') + (role === 'orbit' && UI.sel === g.id ? ' selected' : '');
     const val = g.done ? 'Achieved' : mz.how === 'metric' ? metricText(g) : ms ? pct(g.id) + '%' : '';
     label = levelName(g.tier) + ': ' + g.title + (val ? ', ' + val : ', nothing to measure yet');
     if (role === 'parent') { inner = icon('up'); ext = g.title; act = 'focus'; label = 'Back to ' + g.title; }
@@ -1317,7 +1358,7 @@ function nodeInfo(it) {
       else { inner = '<span class="ttl"' + fsAttr(it) + '>' + esc(g.title) + '</span>' + (val ? '<span class="pct">' + esc(val) + '</span>' : '') + badge; sats = satsHTML(g.id); act = 'focus'; }
     }
   } else if (it.kind === 'task') {
-    const t = T(it.id); if (t.done) cls += ' done'; if (it.loose) cls += ' loose';
+    const t = T(it.id); if (t.done) cls += ' done'; if (it.loose) cls += ' loose'; if (taskHidden(t)) cls += ' ghidden';
     inner = '<span class="tchk">' + (t.done ? icon('check') : '') + '</span><span class="ttl"' + fsAttr(it) + '>' + esc(t.title) + '</span>';
     label = (t.done ? 'Completed task: ' : 'Task: ') + t.title + '. Opens details.'; act = 'openTask';
   } else if (it.kind === 'add') {
@@ -1400,7 +1441,12 @@ function updateStageTools(Lo) {
   b.innerHTML = icon('eye', 'sm') + (UI.showDoneMap ? 'Hide completed' : 'Show completed' + (n ? ' (' + n + ')' : ''));
   b.style.display = n || UI.showDoneMap ? '' : 'none';
   b.classList.toggle('on', !!UI.showDoneMap);
-  $('#resetLayoutBtn').style.display = Lo.items.some(i => i.role === 'orbit' && i.pin) ? '' : 'none';
+  const orb = Lo.items.filter(i => i.role === 'orbit' && i.kind !== 'more');
+  $('#resetLayoutBtn').style.display = orb.some(i => i.pin) ? '' : 'none';
+  $('#freezeBtn').style.display = orb.some(i => !i.pin) ? '' : 'none';
+  const nh = (UI.focus ? kidsOf(UI.focus) : kidsOf(null)).filter(g => goalHidden(g)).length, hb = $('#hiddenMapBtn');
+  hb.innerHTML = icon('eyeoff', 'sm') + (UI.showHidden ? 'Hide hidden' : 'Show hidden' + (nh ? ' (' + nh + ')' : ''));
+  hb.style.display = nh || UI.showHidden ? '' : 'none'; hb.classList.toggle('on', !!UI.showHidden);
 }
 let rs = null;
 function renderResizeUI(Lo) {
@@ -1440,7 +1486,7 @@ document.addEventListener('pointermove', e => {
   setLayout(kind, id, { s: +(d.r / lastLayout.center.r).toFixed(4) });
   renderStage();
 }));
-function setFocusRaw(id) { UI.focus = id || null; UI.composer = null; removeComposer(); }
+function setFocusRaw(id) { UI.focus = id || null; UI.sel = null; UI.composer = null; removeComposer(); try { localStorage.setItem('orbit.focus', UI.focus || ''); } catch (e) {} }
 function setFocus(id) {
   if ((id || null) === UI.focus) return;
   setFocusRaw(id);
@@ -1478,9 +1524,11 @@ function taskRowHTML(t, opts) {
   if (t.steps && t.steps.length) meta.push('<span class="meta">' + t.steps.filter(s => s.done).length + ' of ' + t.steps.length + '</span>');
   if (t.note) meta.push('<span class="meta">' + icon('note') + '</span>');
   const pg = t.goal_id && opts.showGoal !== false ? G(t.goal_id) : null;
-  const pathLine = pg ? '<div class="tpath" title="' + esc(goalPathText(pg.id, true)) + '"><i class="hdot" style="--h:' + hueOf(pg) + '"></i><span>' + esc(goalPathText(pg.id)) + '</span></div>' : '';
+  let pathTxt = pg ? goalPathText(pg.id) : '';
+  if (pg && opts.skipTop) { const pp = pathOf(pg.id).slice(1).map(x => x.title); pathTxt = pp.length > 2 ? pp[0] + ' \u203a \u2026 \u203a ' + pp[pp.length - 1] : pp.join(' \u203a '); }
+  const pathLine = pg && pathTxt ? '<div class="tpath" title="' + esc(goalPathText(pg.id, true)) + '"><i class="hdot" style="--h:' + hueOf(pg) + '"></i><span>' + esc(pathTxt) + '</span></div>' : '';
   const rowHue = t.goal_id && G(t.goal_id) ? hueOf(G(t.goal_id)) : '#3a4556';
-  return '<div class="trow ' + (t.done ? 'done ' : '') + (UI.openTask === t.id ? 'open' : '') + '" data-act="openTask" data-id="' + t.id + '" style="--rh:' + rowHue + '">' +
+  return '<div class="trow ' + (taskHidden(t) ? 'ghidden ' : '') + (t.done ? 'done ' : '') + (UI.openTask === t.id ? 'open' : '') + '" data-act="openTask" data-id="' + t.id + '" style="--rh:' + rowHue + '">' +
     (opts.drag && !t.done ? '<span class="grip" aria-label="Drag to reorder" title="Drag to reorder">' + icon('grip') + '</span>' : '') +
     '<button class="chk" data-act="toggleTask" data-id="' + t.id + '" aria-label="' + (t.done ? 'Mark not complete' : 'Mark complete') + '">' + icon('check') + '</button>' +
     '<div class="tmain"><div class="ttitle">' + esc(t.title) + '</div>' + pathLine + (meta.length ? '<div class="tmeta">' + meta.join('') + '</div>' : '') + '</div>' +
@@ -1491,11 +1539,11 @@ function goalRowHTML(g) {
   const right = g.done ? '<span class="pc" style="color:var(--ok)">done</span>'
     : mz.p === null ? '<span class="pc">empty</span>'
     : '<span class="mini"><i style="width:' + p + '%"></i></span><span class="pc">' + (mz.how === 'metric' ? esc(metricText(g)) : p + '%') + '</span>';
-  return '<button class="grow-row" data-act="focus" data-id="' + g.id + '" style="--h:' + h + '"><i class="hdot"></i><span class="t">' + esc(g.title) + '</span>' + right + icon('right', 'sm muted') + '</button>';
+  return '<button class="grow-row' + (goalHidden(g) ? ' ghidden' : '') + '" data-act="focus" data-id="' + g.id + '" style="--h:' + h + '"><i class="hdot"></i><span class="t">' + esc(g.title) + '</span>' + right + icon('right', 'sm muted') + '</button>';
 }
 function renderPanel() {
   const panel = $('#gpanel');
-  const f = UI.focus, g = f ? G(f) : null;
+  const f = PG(), g = f ? G(f) : null;
   const hue = g ? hueOf(g) : HUES.blue;
   const mz = measure(f), p = pct(f), ms = mz.p !== null;
   const peekVal = g && g.done ? 'Achieved' : g && mz.how === 'metric' ? metricText(g) : ms ? p + '%' : '';
@@ -1511,7 +1559,7 @@ function renderPanel() {
       '<label class="addrow">' + icon('plus') + '<input data-add="goal" placeholder="Add a goal" autocomplete="off"><button class="addbtn" data-act="addRow" type="button">Add</button></label></section>' +
       '<button class="btn ghost" data-act="openAdd" data-t="goal">' + icon('sparkle', 'sm') + 'Browse goal ideas</button>' +
       (floating ? '<button class="grow-row" data-act="view" data-v="all"><i class="hdot" style="--h:#8b98a9"></i><span class="t">' + floating + ' unassigned task' + (floating === 1 ? '' : 's') + ' floating on the map</span>' + icon('right', 'sm muted') + '</button>' : '') +
-      '<p class="small muted">How progress works: a goal\'s percent is the average of what is inside it. Sub-goals count by their own percent, tasks count once checked off (steps give partial credit), and repeating tasks are left out because they are habits. A goal with nothing inside yet shows no percent. For goals like saving money or reading books, switch it to track a number instead.</p><p class="small muted">Tips: tap a goal to go deeper, double-click it for details, tap a task for details. Right-click or long-press any bubble for quick options, including Adjust size. Drag a bubble onto a goal to move it inside, or onto empty space to park it there. Reset layout puts bubbles back in orbit.</p>';
+      '';
   } else {
     const kids = kidsOf(g.id), ts = tasksOf(g.id).sort((a, b) => (a.done - b.done) || ((b.sort || 0) - (a.sort || 0)));
     const parent = g.parent_id ? G(g.parent_id) : null, isNum = +g.metric_target > 0;
@@ -1531,7 +1579,10 @@ function renderPanel() {
       '<div class="frow">' + icon('sort') + '<span class="grow">Order</span><button class="iconbtn" data-act="reorder" data-n="-1" aria-label="Move earlier">' + icon('back') + '</button><button class="iconbtn" data-act="reorder" data-n="1" aria-label="Move later">' + icon('right') + '</button></div>' +
       (isNum ? '<div class="frow metric"><button class="iconbtn" data-act="metricStep" data-n="-1" aria-label="Decrease">-</button><input type="number" min="0" step="any" data-gfield="metric_current" value="' + (+g.metric_current || 0) + '" aria-label="Current"><span>of</span><input type="number" min="0" step="any" data-gfield="metric_target" value="' + (+g.metric_target) + '" aria-label="Target"><input type="text" class="unit" data-gfield="metric_unit" placeholder="unit" value="' + esc(g.metric_unit || '') + '" aria-label="Unit"><button class="iconbtn" data-act="metricStep" data-n="1" aria-label="Increase">+</button></div>' : '') +
       '</div>' +
-      '<button class="btn ' + (g.done ? 'good' : 'ghost') + '" data-act="achieve">' + icon('check', 'sm') + (g.done ? 'Achieved' : 'Mark achieved') + '</button>';
+      '<div class="btn-row">' + (g.id !== UI.focus ? '<button class="btn" data-act="goInside">' + icon('right', 'sm') + 'Go inside</button>' : '') +
+      '<button class="btn ' + (g.done ? 'good' : 'ghost') + '" data-act="achieve">' + icon('check', 'sm') + (g.done ? 'Achieved' : 'Mark achieved') + '</button>' +
+      '<button class="btn ghost" data-act="' + (g.layout && g.layout.h ? 'unhideGoal' : 'hideGoal') + '">' + icon(g.layout && g.layout.h ? 'eye' : 'eyeoff', 'sm') + (g.layout && g.layout.h ? 'Unhide' : 'Hide') + '</button></div>' +
+      (goalHidden(g) ? '<div class="nomeasure">' + (g.layout && g.layout.h ? 'Hidden: this goal and everything inside it are out of your lists and map until you unhide it.' : 'Hidden because a goal above it is hidden.') + '</div>' : '');
     if (g.tier < MAX_DEPTH) h += '<section><div class="sec-h">Sub-goals <span class="n">' + kids.length + '</span></div>' + kids.map(goalRowHTML).join('') +
       '<label class="addrow">' + icon('plus') + '<input data-add="goal" placeholder="Add a sub-goal" autocomplete="off"><button class="addbtn" data-act="addRow" type="button">Add</button></label></section>';
     h += '<section id="panelTasks"><div class="sec-h">Tasks <span class="n">' + ts.filter(t => !t.done).length + ' open</span></div>' + ts.map(t => taskRowHTML(t, { showGoal: false })).join('') +
@@ -1582,7 +1633,7 @@ function renderTasks() {
   $('#thead').innerHTML = head;
   if (UI.renaming) { const r = $('#renameInput'); if (r) { r.focus(); r.select(); } }
 
-  let arr = UI.q ? S.tasks.filter(t => (t.title + ' ' + (t.note || '')).toLowerCase().indexOf(UI.q.toLowerCase()) >= 0) : S.tasks.filter(viewFilter(v));
+  let arr = UI.q ? S.tasks.filter(t => (t.title + ' ' + (t.note || '')).toLowerCase().indexOf(UI.q.toLowerCase()) >= 0) : S.tasks.filter(viewFilter(v)).filter(showT);
   const open = sortTasks(arr.filter(t => !t.done), sortMode), done = arr.filter(t => t.done).sort((a, b) => String(b.done_at).localeCompare(String(a.done_at)));
   const showList = v.indexOf('list:') !== 0;
   const manual = (v === 'myday' || v === 'myweek') && !UI.q;
@@ -1605,7 +1656,10 @@ function renderTasks() {
       '<div class="srow"><span class="t">' + esc(t.title) + '</span><span class="small ' + (dayDiff(t.due) < 0 ? 'meta over' : 'muted') + '">' + (dayDiff(t.due) < 0 ? 'Overdue' : 'Due today') + '</span><button class="chip" data-act="toMyDay" data-id="' + t.id + '">' + icon('plus', 'sm') + 'Add</button></div>').join('') + '</div>';
   }
   if (v === 'all' && !UI.q) {
-    h += '<div class="seg-row"><div class="seg">' + [['tree', 'By goal'], ['list', 'List']].map(m => '<button data-act="allMode" data-m="' + m[0] + '" class="' + ((UI.allMode || 'tree') === m[0] ? 'on' : '') + '">' + m[1] + '</button>').join('') + '</div></div>';
+    const sd = !!UI.showDone[v];
+    h += '<div class="seg-row"><div class="seg">' + [['tree', 'By goal'], ['list', 'List']].map(m => '<button data-act="allMode" data-m="' + m[0] + '" class="' + ((UI.allMode || 'tree') === m[0] ? 'on' : '') + '">' + m[1] + '</button>').join('') + '</div>' +
+      '<span class="tools"><button class="chip ' + (sd ? 'on' : '') + '" data-act="toggleDone">' + icon('eye', 'sm') + (sd ? 'Hide completed' : 'Show completed') + '</button>' +
+      (S.goals.some(g => g.layout && g.layout.h) ? '<button class="chip ' + (UI.showHidden ? 'on' : '') + '" data-act="toggleHidden">' + icon('eyeoff', 'sm') + (UI.showHidden ? 'Hide hidden' : 'Show hidden') + '</button>' : '') + '</span></div>';
     h += UI.allMode === 'list' ? flatGroupedHTML(v) : goalTreeHTML(v);
     $('#tlist').innerHTML = h; return;
   }
@@ -1641,19 +1695,20 @@ function renderTasks() {
 function goalTreeHTML(vk, filt) {
   filt = filt || (() => true);
   const showDone = !!UI.showDone[vk];
-  let h = '<button class="sec-toggle ' + (showDone ? '' : 'closed') + '" data-act="toggleDone" style="margin-top:4px">' + icon('down', 'sm') + (showDone ? 'Hide completed tasks' : 'Show completed tasks') + '</button>';
+  let h = '';
   const sec = g => {
+    if (!showG(g)) return '';
     const closed = !UI.expanded[g.id], mz = measure(g.id);
     const ts = tasksOf(g.id).filter(t => filt(t) && (showDone || !t.done)).sort((a, b) => (a.done - b.done) || String(a.due || '9').localeCompare(String(b.due || '9')));
     const open = branchTasks(g.id).filter(t => !t.done && filt(t)).length;
     const val = g.done ? 'done' : mz.how === 'metric' ? metricText(g) : mz.p !== null ? pct(g.id) + '%' : '';
-    let x = '<div class="gsec" style="--h:' + hueOf(g) + '"><div class="gsec-h ' + (closed ? 'closed' : '') + '" data-act="toggleSec" data-id="' + g.id + '" role="button" tabindex="0">' + icon('down', 'sm chev') + '<i class="hdot"></i><span class="t">' + esc(g.title) + '</span>' +
+    let x = '<div class="gsec' + (goalHidden(g) ? ' ghidden' : '') + '" style="--h:' + hueOf(g) + '"><div class="gsec-h ' + (closed ? 'closed' : '') + '" data-act="toggleSec" data-id="' + g.id + '" role="button" tabindex="0">' + icon('down', 'sm chev') + '<i class="hdot"></i><span class="t">' + esc(g.title) + '</span>' +
       (val ? '<span class="v mono">' + esc(val) + '</span>' : '') + '<span class="n mono">' + open + ' open</span><button class="iconbtn sm" data-act="openGoalMap" data-id="' + g.id + '" title="Open on the goal map" aria-label="Open on the goal map">' + icon('target', 'sm') + '</button></div>';
     if (!closed) x += '<div class="gsec-b">' + ts.map(t => taskRowHTML(t, { showGoal: false, view: 'linked', showList: true })).join('') + kidsOf(g.id).map(sec).join('') +
       '<label class="addrow slim">' + icon('plus') + '<input data-addtask-goal="' + g.id + '" placeholder="Add a task" autocomplete="off"><button class="addbtn" data-act="addRow" type="button">Add</button></label></div>';
     return x + '</div>';
   };
-  const tops = kidsOf(null);
+  const tops = kidsOf(null).filter(showG);
   if (!tops.length) h += '<div class="empty"><div class="big">No goals yet</div>Add goals on the Goals map and they show up here with their tasks.</div>';
   h += tops.map(sec).join('');
   const loose = S.tasks.filter(t => !t.goal_id && filt(t) && (showDone || !t.done));
@@ -1666,10 +1721,10 @@ function goalTreeHTML(vk, filt) {
 }
 function flatGroupedHTML(vk) {
   const showDone = !!UI.showDone[vk];
-  let h = '<button class="sec-toggle ' + (showDone ? '' : 'closed') + '" data-act="toggleDone" style="margin-top:4px">' + icon('down', 'sm') + (showDone ? 'Hide completed tasks' : 'Show completed tasks') + '</button>';
+  let h = '';
   const ord = (a, b) => (a.done - b.done) || String(a.due || '9').localeCompare(String(b.due || '9'));
-  const groups = kidsOf(null).map(g => {
-    const list = []; (function walk(id) { tasksOf(id).slice().sort(ord).forEach(t => list.push(t)); kidsOf(id).forEach(k => walk(k.id)); })(g.id);
+  const groups = kidsOf(null).filter(showG).map(g => {
+    const list = []; (function walk(id) { tasksOf(id).slice().sort(ord).forEach(t => list.push(t)); kidsOf(id).filter(showG).forEach(k => walk(k.id)); })(g.id);
     return { title: g.title, hue: hueOf(g), tasks: list.filter(t => showDone || !t.done) };
   });
   groups.push({ title: 'No goal yet', hue: '#8b98a9', tasks: S.tasks.filter(t => !t.goal_id && (showDone || !t.done)).sort(ord) });
@@ -1677,7 +1732,7 @@ function flatGroupedHTML(vk) {
   groups.forEach(gr => {
     if (!gr.tasks.length) return; any = true;
     h += '<div class="fgroup" style="--h:' + gr.hue + '"><div class="fgroup-h"><i class="hdot"></i>' + esc(gr.title) + ' <span class="mono small muted">' + gr.tasks.filter(t => !t.done).length + ' open</span></div>' +
-      gr.tasks.map(t => taskRowHTML(t, { view: vk, showList: true })).join('') + '</div>';
+      gr.tasks.map(t => taskRowHTML(t, { view: vk, showList: true, skipTop: true })).join('') + '</div>';
   });
   if (!any) h += '<div class="empty"><div class="big">No tasks yet</div>Add one above, or add tasks to goals on the Goals map.</div>';
   return h;
@@ -1827,7 +1882,6 @@ const LIB_TEXT = `
 - Take the exam
 ## Keep it active
 - Track continuing education credits
-
 @Career
 # Land a new job | hired employment offer job search
 ## Get my materials ready
@@ -1883,7 +1937,6 @@ const LIB_TEXT = `
 - Ask one of them for a monthly call
 ## Build a visible presence
 - Post on LinkedIn every other week
-
 @Health & fitness
 # Get in the best shape of my life | fit fitness strong shape athletic
 ## Train consistently {150 workouts}
@@ -1942,7 +1995,55 @@ const LIB_TEXT = `
 ## Stay on top of checkups
 - Book an annual physical
 - Book a dental cleaning
-
+# Run a marathon | marathon 26.2 long distance
+## Build to 30 miles a week
+- Run 4 times a week
+## Follow an 18 week plan
+- Do a long run every weekend
+- Practice race day fueling
+## Race day ready
+- Register for the race
+- Taper for the last 2 weeks
+# Complete a triathlon | triathlon swim bike tri
+## Learn efficient swimming
+- Take 4 swim lessons
+- Swim 3 times a week
+## Build bike endurance
+- Ride twice a week
+## Put it together
+- Do a brick workout each week
+- Register for a sprint triathlon
+# Quit smoking or vaping | quit smoking vaping nicotine cigarettes
+## Pick a quit date
+- Set my quit date
+- Tell 2 people for support
+## Handle cravings
+- List my triggers
+- Get nicotine replacement if needed
+## Stay smoke free {90 days}
+- Track smoke free days
+# Learn to swim | swim swimming pool water
+## Get comfortable in the water
+- Book beginner lessons
+## Swim one full length
+- Practice breathing drills
+## Swim 20 minutes nonstop
+- Swim twice a week
+# Build a meditation practice | meditate meditation mindfulness calm anxiety stress
+## Meditate daily {30 days}
+- Meditate 10 minutes each morning
+## Learn the techniques
+- Try 3 guided styles
+## Stay consistent
+- Track my streak
+# Get stronger at the gym | gym lift lifting muscle strength bench squat deadlift bulk
+## Follow a strength program
+- Pick a proven 3 or 4 day program
+- Log every workout
+## Eat for muscle
+- Hit my protein target most days
+## Hit new personal records {3 PRs}
+- Test my 1 rep max every 8 weeks
 @Money
 # Build an emergency fund | savings save rainy day
 ## Save three months of expenses {10000 $}
@@ -1989,7 +2090,43 @@ const LIB_TEXT = `
 - Make an offer
 - Schedule the inspection
 - Close and get the keys
-
+# Improve my credit score | credit score fico report
+## Know where I stand
+- Pull free credit reports
+- Dispute any errors
+## Build good history
+- Set up autopay for every bill
+- Keep card balances under 30%
+## Reach a 750 score
+- Check my score monthly
+# Retire early | fire retire retirement early financial independence
+## Know my number
+- Calculate yearly expenses
+- Multiply by 25 for my target
+## Raise my savings rate {50 %}
+- Cut my 3 biggest expenses
+- Increase retirement contributions
+## Invest the difference
+- Automate monthly index fund buys
+# Buy my first rental property | rental investment property landlord real estate investing
+## Learn the numbers
+- Read one rental investing book
+- Analyze 20 deals on paper
+## Save for the down payment {50000 $}
+- Automate monthly savings
+## Buy and rent it
+- Get pre-approved
+- Make offers on 3 properties
+- Screen tenants
+# Buy a car | car vehicle auto truck
+## Set the budget
+- Decide on total price and monthly payment
+## Save a down payment {5000 $}
+- Automate weekly savings
+## Choose and buy
+- Test drive 3 cars
+- Get a pre-approved auto loan
+- Negotiate the out-the-door price
 @Business
 # Start a side business | side hustle startup online business income
 ## Validate the idea
@@ -2032,7 +2169,34 @@ const LIB_TEXT = `
 ## Close the purchase
 - Arrange financing
 - Sign the purchase agreement
-
+# Launch an online store | ecommerce shopify store online shop etsy dropship
+## Pick products and a niche
+- Research 10 product ideas
+- Order samples
+## Build the store
+- Set up the store platform
+- Take product photos
+## Get first sales {10 orders}
+- Run a small ad test
+- Post on social daily
+# Start freelancing | freelance freelancer consulting clients contract
+## Package my service
+- Define one clear offer and price
+- Build a simple portfolio page
+## Land first clients {3 clients}
+- Message 20 past contacts
+- Pitch on 2 freelance platforms
+## Build steady income
+- Ask every client for a referral
+# Launch an app | app mobile ios android startup product
+## Validate the problem
+- Interview 10 target users
+## Build the first version
+- Sketch the core screens
+- Build the MVP
+## Launch and learn {100 users}
+- Launch to a first group of users
+- Collect feedback weekly
 @Relationships
 # Strengthen my relationship | partner marriage spouse girlfriend boyfriend wife husband
 ## Make quality time a habit
@@ -2065,7 +2229,28 @@ const LIB_TEXT = `
 ## Finish the details
 - Send invitations
 - Plan the ceremony
-
+# Make new friends in a new city | new city friends social lonely community meetup
+## Put myself out there
+- Join 2 clubs or classes
+- Say yes to every invite this month
+## Turn acquaintances into friends
+- Invite someone for coffee each week
+## Build a regular group
+- Start a monthly dinner or game night
+# Prepare for a baby | baby pregnancy newborn parent parenthood
+## Get ready financially
+- Update the budget for childcare
+- Review insurance coverage
+## Prepare the home
+- Set up the nursery
+- Install the car seat
+## Plan for leave
+- Talk to my employer about leave
+# Get closer with my family | family parents siblings mom dad relatives
+## Stay in touch
+- Call my parents every week
+## Make memories
+- Plan a family trip or gathering
 @Personal growth
 # Read more books | read reading books
 ## Read 24 books this year {24 books}
@@ -2090,7 +2275,26 @@ const LIB_TEXT = `
 - Join Toastmasters or a speaking group
 ## Speak in public
 - Give a talk at work or a meetup
-
+# Grow in my faith | faith church prayer bible quran spiritual religion mosque
+## Build a daily practice {30 days}
+- Pray or reflect every morning
+- Read one passage a day
+## Join a community
+- Attend services weekly
+- Join a study group
+# Give back to my community | volunteer volunteering charity give back service
+## Find a cause
+- List 3 causes I care about
+## Volunteer regularly {24 hours}
+- Sign up for a monthly shift
+# Become more productive | productivity focus time management organized procrastination
+## Plan every week
+- Do a weekly review on Sunday
+## Protect focus time
+- Block 2 deep work hours a day
+- Turn off notifications during focus time
+## Build a reliable system
+- Capture every task in one place
 @Home & living
 # Move to a new place | move apartment relocate
 ## Plan the move
@@ -2117,7 +2321,22 @@ const LIB_TEXT = `
 ## Hire and build
 - Get 3 contractor quotes
 - Order materials
-
+# Learn to cook | cook cooking chef meals kitchen recipes
+## Master the basics
+- Learn 5 knife skills
+- Cook 3 simple recipes
+## Cook at home more {20 meals}
+- Plan meals every Sunday
+## Build a go-to menu
+- Perfect 10 favorite dishes
+# Get a pet | pet dog cat puppy kitten adopt
+## Get ready
+- Check my lease or HOA rules
+- Budget for food, vet and supplies
+## Find the right pet
+- Visit 2 shelters
+## Settle in
+- Book the first vet visit
 @Travel
 # Take a dream trip | trip vacation travel
 ## Plan it
@@ -2132,7 +2351,19 @@ const LIB_TEXT = `
 # Visit 10 new countries | countries travel world
 ## Plan this year's trips {10 countries}
 - Choose the next 2 destinations
-
+# Take a road trip | road trip drive national parks
+## Plan the route
+- Pick stops and overnight spots
+## Prepare the car
+- Get an oil change and tire check
+## Go
+- Pack an emergency kit
+# Get my passport and travel abroad | passport abroad international travel
+## Get the passport
+- Fill out the passport application
+- Book a passport photo
+## Plan the first trip
+- Pick a country and dates
 @Creative
 # Write a book | author novel writing
 ## Outline it
@@ -2163,6 +2394,92 @@ const LIB_TEXT = `
 ## Perform
 - Learn 5 full songs
 - Play for friends
+# Learn photography | photography photos camera photographer
+## Learn my camera
+- Shoot in manual mode for a week
+## Practice {1000 photos}
+- Do a weekly photo walk
+## Share my work
+- Post my 10 best photos
+# Start a blog or newsletter | blog newsletter writing substack
+## Pick my topic
+- Write down 20 post ideas
+## Publish consistently {24 posts}
+- Publish every other week
+## Grow readers
+- Share each post in 2 places
+# Learn to dance | dance dancing salsa
+## Take classes {20 classes}
+- Sign up for a beginner series
+## Practice outside class
+- Go to one social dance a month
+@Career paths
+# Become a software engineer | coding programmer developer software code tech
+## Learn the fundamentals
+- Pick one language to start (Python or JavaScript)
+- Finish an intro course
+- Code 1 hour every day
+## Build a portfolio {3 projects}
+- Build a project that solves a real problem
+- Put every project on GitHub with a README
+## Prepare for technical interviews
+- Solve 2 practice problems a day
+- Do 3 mock interviews
+## Get hired
+- Apply to 30 junior roles
+- Reach out to engineers for referrals
+# Become a registered nurse | nurse nursing rn healthcare
+## Get into a nursing program
+- Finish prerequisite classes
+- Take the TEAS exam
+- Apply to 3 programs
+## Complete clinical rotations
+- Keep a clinical skills log
+## Pass the NCLEX
+- Build an NCLEX study plan
+- Do 100 practice questions a day
+## Land a first nursing job
+- Apply to new grad residency programs
+# Get into law school | lawyer attorney law lsat
+## Score well on the LSAT
+- Take a diagnostic LSAT
+- Study 15 hours a week
+- Book the test date
+## Build a strong application
+- Write a personal statement
+- Request 2 recommendation letters
+- Apply to 8 schools
+## Pay for it smartly
+- Compare scholarship offers
+# Become a real estate agent | realtor real estate license property
+## Get licensed
+- Complete the pre-license course
+- Pass the state exam
+## Join a brokerage
+- Interview 3 brokerages
+## Close first deals {5 deals}
+- Tell 50 people I am an agent
+- Host an open house
+# Earn a cloud or IT certification | aws azure security plus comptia cloud it cyber
+## Pick the certification
+- Compare 3 certifications for my career path
+## Study and practice {60 hours}
+- Follow a video course
+- Build hands-on labs
+- Take 2 practice exams
+## Pass the exam
+- Schedule the exam
+# Get a job in government | federal government clearance usajobs public service
+## Target the right roles
+- Set up USAJOBS saved searches
+- Learn the GS pay scale for my field
+## Build a federal resume
+- Rewrite resume in federal format
+- Match keywords to each announcement
+## Apply and follow up {15 applications}
+- Apply to 3 roles a week
+## Prepare for clearance and onboarding
+- Gather addresses and employment history
 `;
 const STOP = new Set('a an the to my of for and in on at be get make become more new i with by from our your me it as'.split(' '));
 const toks = str => String(str).toLowerCase().replace(/[^a-z0-9 ]/g, ' ').split(/\s+/).filter(w => w && !STOP.has(w)).map(w => w.length > 4 ? w.replace(/(ing|s)$/, '') : w);
@@ -2202,6 +2519,29 @@ function libSearch(q, want) {
     if (sc > 0) out.push({ n: n, sc: sc });
   });
   return out.sort((a, b) => b.sc - a.sc || a.n.title.length - b.n.title.length).slice(0, 8).map(x => x.n);
+}
+const CAT_GENERIC = {
+  'Health & fitness': { g: ['Set a clear, measurable target', 'Train consistently every week', 'Dial in nutrition', 'Sleep and recover well', 'Track progress every month'], t: ['Book a check-up', 'Plan this week\'s workouts', 'Prep healthy meals on Sunday', 'Log today\'s workout', 'Take progress photos'] },
+  'Money': { g: ['Know my numbers', 'Build a monthly budget', 'Automate savings', 'Cut one big expense', 'Grow my income'], t: ['List all accounts and balances', 'Review last month\'s spending', 'Set up an automatic transfer', 'Cancel unused subscriptions', 'Check my credit report'] },
+  'Career': { g: ['Clarify the target role', 'Close my skill gaps', 'Build proof of my work', 'Grow my network', 'Land the opportunity'], t: ['Update my resume', 'Message 3 people in the field', 'Finish one course module', 'Ask my manager for feedback', 'Apply to 3 roles'] },
+  'Career paths': { g: ['Learn the required skills', 'Get the credential', 'Get real experience', 'Land the first role'], t: ['Research requirements for the role', 'Talk to 2 people doing this job', 'Sign up for the first course', 'Update my resume for this path'] },
+  'Education': { g: ['Choose the program', 'Get admitted', 'Pay for it', 'Keep strong grades', 'Finish on time'], t: ['Compare 3 programs', 'Check application deadlines', 'Fill out financial aid forms', 'Set a weekly study schedule'] },
+  'Business': { g: ['Validate the idea', 'Set up the business', 'Launch the first offer', 'Get the first customers', 'Grow revenue'], t: ['Talk to 5 potential customers', 'Write a one page plan', 'Register the business name', 'Set up a simple website'] },
+  'Relationships': { g: ['Make regular time together', 'Communicate better', 'Build shared plans'], t: ['Plan something together this week', 'Send a thoughtful message', 'Put phones away at dinner'] },
+  'Personal growth': { g: ['Build the daily habit', 'Learn from the best', 'Track my streak'], t: ['Pick a start date', 'Find one book or course', 'Set a daily reminder'] },
+  'Home & living': { g: ['Plan it', 'Budget for it', 'Get it done'], t: ['List what needs to happen', 'Set a budget', 'Get 3 quotes'] },
+  'Travel': { g: ['Plan the trip', 'Save for it', 'Book it'], t: ['Pick dates', 'Set a budget', 'Check passport and visa rules'] },
+  'Creative': { g: ['Learn the basics', 'Practice consistently', 'Share my work'], t: ['Pick a beginner course', 'Schedule practice time', 'Finish one small piece'] }
+};
+function catFor(g) {
+  const words = new Set(); pathOf(g.id).forEach(x => toks(x.title).forEach(w => words.add(w)));
+  let best = null, bs = 0;
+  LIB.forEach(c => {
+    let sc = 0; const cw = new Set(); c.goals.forEach(n => (function walk(nn) { nn.words && nn.words.forEach(w => cw.add(w)); (nn.children || []).forEach(walk); })(n));
+    words.forEach(w => { if (cw.has(w)) sc++; });
+    if (sc > bs) { bs = sc; best = c.name; }
+  });
+  return bs ? best : null;
 }
 function libNodeFor(g) {
   if (g.template_key && LIBMAP[g.template_key]) return LIBMAP[g.template_key];
@@ -2244,7 +2584,12 @@ function suggestionsFor(a) {
   const node = libNodeFor(g), want = a.type === 'task' ? 'task' : 'goal';
   let items = node ? fresh(node.children.filter(c => c.type === want)) : [];
   let label = node ? 'Suggested for "' + node.title + '"' : '';
-  if (!items.length) { items = fresh((want === 'task' ? GENERIC_TASKS : GENERIC_GOALS).map(x => ({ type: want, title: x, children: [] }))); label = 'Ideas that fit most goals'; }
+  if (!items.length) {
+    const cat = catFor(g), cg = cat && CAT_GENERIC[cat];
+    const pool = cg ? (want === 'task' ? cg.t : cg.g) : (want === 'task' ? GENERIC_TASKS : GENERIC_GOALS);
+    items = fresh(pool.map(x => ({ type: want, title: x, children: [] })));
+    label = cg ? 'Ideas for ' + cat.toLowerCase() + ' goals' : 'Ideas that fit most goals';
+  }
   return { label: label, items: items };
 }
 function countTree(n) { let g = 0, t = 0; (n.children || []).forEach(c => { if (c.type === 'task') t++; else { g++; const x = countTree(c); g += x.g; t += x.t; } }); return { g: g, t: t }; }
@@ -2341,9 +2686,12 @@ document.addEventListener('click', e => {
     case 'openSide': $('#side').classList.add('open'); $('#sideScrim').classList.add('on'); break;
     case 'closeSide': closeSide(); break;
     case 'focus': {
-      // a second click right after navigating counts as a double-click: open details
-      if (a.classList.contains('node') && UI.lastNav && Date.now() - UI.lastNav < 420) { UI.lastNav = 0; showPanel(true); break; }
-      setFocus(id || null); if (a.classList.contains('node')) UI.lastNav = Date.now(); break;
+      if (a.classList.contains('node') && a.classList.contains('orbit')) {
+        const now = Date.now();
+        if (UI.lastTap && UI.lastTap.id === id && now - UI.lastTap.t < 450) { UI.lastTap = null; setFocus(id); break; }
+        UI.lastTap = { id: id, t: now }; UI.sel = id; renderPanel(); renderStage(); break;
+      }
+      setFocus(id || null); break;
     }
     case 'openGoalMap': e.stopPropagation(); UI.view = 'goals'; setFocusRaw(id); render(); break;
     case 'toggleSec': UI.expanded[id] = !UI.expanded[id]; try { localStorage.setItem('orbit.expanded', JSON.stringify(UI.expanded)); } catch (er) {} renderTasks(); break;
@@ -2357,12 +2705,12 @@ document.addEventListener('click', e => {
     case 'localImportAsk': offerLocalImport(); break;
     case 'localSkip': closeDlg(); toast('You can bring it in later from Settings.'); break;
     case 'deleteAllGo': if (($('#dlgInput') || {}).value === 'DELETE') { closeDlg(); startFresh(); } break;
-    case 'centerTap': showPanel(true); break;
+    case 'centerTap': UI.sel = null; renderPanel(); renderStage(); if (!UI.panelOff && window.innerWidth <= 860) $('#gpanel').classList.add('open'); break;
     case 'showPanel': showPanel(true); break;
     case 'hidePanel': e.stopPropagation(); hidePanel(); break;
     case 'sheet': $('#gpanel').classList.toggle('open'); break;
     case 'compose': openAdd(UI.focus); break;
-    case 'openAdd': openAdd(UI.focus, a.dataset.t); break;
+    case 'openAdd': openAdd(PG(), a.dataset.t); break;
     case 'closeAdd': closeAdd(); break;
     case 'addType': UI.add.type = a.dataset.t; UI.add.ai = null; renderAddSheet(); break;
     case 'addCat': UI.add.cat = a.dataset.c; renderAddSheet(); break;
@@ -2371,7 +2719,19 @@ document.addEventListener('click', e => {
     case 'aiSuggest': aiSuggest(); break;
     case 'moreRoot': setView('all'); break;
     case 'toggleDoneMap': UI.showDoneMap = !UI.showDoneMap; try { localStorage.setItem('orbit.showDoneMap', UI.showDoneMap ? '1' : '0'); } catch (er) {} renderStage(); break;
-    case 'resetLayout': if (lastLayout) { lastLayout.items.filter(i => i.role === 'orbit' && i.pin).forEach(i => setLayout(i.kind, i.id, { x: null, y: null })); renderStage(); toast('Bubbles are back in orbit'); } break;
+    case 'resetLayout': if (lastLayout) { lastLayout.items.filter(i => i.role === 'orbit' && i.pin).forEach(i => { if (i.kind === 'add') setAddPos(null); else setLayout(i.kind, i.id, { x: null, y: null }); }); renderStage(); toast('Bubbles are back in orbit', true); } break;
+    case 'freezeLayout': if (lastLayout) {
+      const Lo = lastLayout, nx = v => +clamp(v, -1, 1).toFixed(4);
+      Lo.items.filter(i => i.role === 'orbit' && i.kind !== 'more' && !i.pin).forEach(i => {
+        const pos = { x: nx((i.x - Lo.cx) / Lo.AX), y: nx((i.y - Lo.cy) / Lo.AY) };
+        if (i.kind === 'add') setAddPos(pos); else setLayout(i.kind, i.id, pos);
+      });
+      renderStage(); toast('Layout frozen. Every bubble stays where it is.', true);
+    } break;
+    case 'toggleHidden': UI.showHidden = !UI.showHidden; try { localStorage.setItem('orbit.showHidden', UI.showHidden ? '1' : '0'); } catch (er) {} render(); break;
+    case 'hideGoal': setHidden(PG(), true); break;
+    case 'unhideGoal': setHidden(PG(), false); break;
+    case 'goInside': setFocus(PG()); break;
     case 'rsDone': UI.resizing = null; renderStage(); break;
     case 'rsReset': { const it = lastLayout && lastLayout.items.find(i => i.key === UI.resizing); if (it) setLayout(it.kind, it.id, { s: null }); renderStage(); break; }
     case 'repDay': {
@@ -2380,10 +2740,10 @@ document.addEventListener('click', e => {
       if (i > -1) { if (o.days.length > 1) o.days.splice(i, 1); } else o.days.push(d);
       const r = repeatStr(o); updateTask(t, { repeat: r, due_scope: null, due: t.done ? t.due : firstOccurrence(r) }); $('#drawer').dataset.id = ''; render(); break;
     }
-    case 'reorder': reorderGoal(UI.focus, +a.dataset.n); render(); break;
+    case 'reorder': reorderGoal(PG(), +a.dataset.n); render(); break;
     case 'startFresh': startFresh(); break;
     case 'metricStep': {
-      const g = G(UI.focus); const v = Math.max(0, (+g.metric_current || 0) + (+a.dataset.n));
+      const g = G(PG()); const v = Math.max(0, (+g.metric_current || 0) + (+a.dataset.n));
       updateGoal(g, { metric_current: v }); render();
       if (v >= +g.metric_target && v - (+a.dataset.n) < +g.metric_target) toast('Target reached for "' + g.title + '"');
       break;
@@ -2397,10 +2757,10 @@ document.addEventListener('click', e => {
       break;
     }
     case 'seed': seedExample(); render(); break;
-    case 'achieve': { const g = G(UI.focus); setAchieved(g.id, !g.done); break; }
+    case 'achieve': { const g = G(PG()); setAchieved(g.id, !g.done); break; }
     case 'delGoalGo': closeDlg(); deleteGoal(id, true); break;
-    case 'color': updateGoal(G(UI.focus), { color: a.dataset.c }); render(); break;
-    case 'delGoal': deleteGoal(UI.focus); break;
+    case 'color': updateGoal(G(PG()), { color: a.dataset.c }); render(); break;
+    case 'delGoal': deleteGoal(PG()); break;
     case 'openTask': UI.openTask = id; UI.pickDate = false; render(); break;
     case 'closeDrawer': UI.openTask = null; UI.pickDate = false; render(); break;
     case 'toggleTask': {
@@ -2522,7 +2882,7 @@ function renderCtx() {
   if (c.kind === 'goal') {
     const g = G(c.id); if (!g) return closeCtx(); title = g.title;
     items = [['open', 'Open details', 'note'], ['inside', 'Go inside', 'right'], ['add', 'Add sub-goal or task', 'plus'],
-      [g.done ? 'unachieve' : 'achieve', g.done ? 'Mark not achieved' : 'Mark achieved', 'check'], ['rename', 'Rename', 'pencil'], ['move', 'Move to\u2026', 'layers'], ['resize', 'Adjust size', 'resize']]
+      [g.done ? 'unachieve' : 'achieve', g.done ? 'Mark not achieved' : 'Mark achieved', 'check'], ['rename', 'Rename', 'pencil'], ['move', 'Move to\u2026', 'layers'], ['resize', 'Adjust size', 'resize'], [g.layout && g.layout.h ? 'unhide' : 'hide', g.layout && g.layout.h ? 'Unhide' : 'Hide', g.layout && g.layout.h ? 'eye' : 'eyeoff']]
       .concat(g.layout && g.layout.s ? [['resetsize', 'Reset size', 'undo']] : []).concat(g.layout && g.layout.x != null ? [['resetpos', 'Put back in orbit', 'undo']] : []).concat([['delete', 'Delete', 'trash', 'danger']]);
   } else if (c.kind === 'task') {
     const t = T(c.id); if (!t) return closeCtx(); title = t.title;
@@ -2574,8 +2934,9 @@ function ctxDo(action) {
   }
   if (c.kind === 'goal') {
     const g = G(id);
-    if (action === 'open' || action === 'rename') { UI.view = 'goals'; setFocusRaw(id); showPanel(true); render(); if (action === 'rename') focusRename('.ptitle'); }
+    if (action === 'open' || action === 'rename') { UI.view = 'goals'; if (UI.focus !== (g.parent_id || null) && UI.focus !== id) setFocusRaw(g.parent_id || null); UI.sel = UI.focus === id ? null : id; showPanel(true); render(); if (action === 'rename') focusRename('.ptitle'); }
     else if (action === 'inside') { UI.view = 'goals'; setFocus(id); render(); }
+    else if (action === 'hide' || action === 'unhide') setHidden(id, action === 'hide');
     else if (action === 'add') openAdd(id);
     else if (action === 'achieve' || action === 'unachieve') setAchieved(id, action === 'achieve');
     else if (action === 'delete') deleteGoal(id);
@@ -2652,7 +3013,7 @@ document.addEventListener('input', e => {
     saveProfile(); return;
   }
   if (el.dataset.gfield) {
-    const g = G(UI.focus); const f = el.dataset.gfield;
+    const g = G(PG()); const f = el.dataset.gfield;
     if (f === 'title') { autosize(el); updateGoal(g, { title: el.value }, 500); renderLight(); }
     else if (f === 'note') updateGoal(g, { note: el.value }, 600);
     return;
@@ -2666,22 +3027,22 @@ document.addEventListener('input', e => {
 document.addEventListener('change', e => {
   const el = e.target;
   if (el.id === 'importFile') { if (el.files[0]) importData(el.files[0]); el.value = ''; return; }
-  if (el.dataset.gfield === 'target_date') { updateGoal(G(UI.focus), { target_date: el.value || null }); return; }
-  if (el.dataset.gfield === 'move') { moveGoal(UI.focus, el.value === '__root' ? null : el.value); render(); return; }
+  if (el.dataset.gfield === 'target_date') { updateGoal(G(PG()), { target_date: el.value || null }); return; }
+  if (el.dataset.gfield === 'move') { moveGoal(PG(), el.value === '__root' ? null : el.value); render(); return; }
   if (el.dataset.gfield === 'measure') {
-    const g = G(UI.focus);
+    const g = G(PG());
     if (el.value === 'number') updateGoal(g, { metric_target: +g.metric_target > 0 ? g.metric_target : 10, metric_current: +g.metric_current || 0 });
     else updateGoal(g, { metric_target: null });
     render(); return;
   }
   if (el.dataset.gfield === 'metric_current' || el.dataset.gfield === 'metric_target') {
-    const g = G(UI.focus), v = parseFloat(el.value), patch = {};
+    const g = G(PG()), v = parseFloat(el.value), patch = {};
     if (el.dataset.gfield === 'metric_target') patch.metric_target = v > 0 ? v : g.metric_target;
     else patch.metric_current = isNaN(v) ? 0 : Math.max(0, v);
     updateGoal(g, patch); render(); return;
   }
-  if (el.dataset.gfield === 'metric_unit') { updateGoal(G(UI.focus), { metric_unit: el.value.trim() || null }); render(); return; }
-  if (el.dataset.gfield === 'title' && !el.value.trim()) { el.value = 'Untitled'; updateGoal(G(UI.focus), { title: 'Untitled' }); render(); return; }
+  if (el.dataset.gfield === 'metric_unit') { updateGoal(G(PG()), { metric_unit: el.value.trim() || null }); render(); return; }
+  if (el.dataset.gfield === 'title' && !el.value.trim()) { el.value = 'Untitled'; updateGoal(G(PG()), { title: 'Untitled' }); render(); return; }
   if (el.dataset.dl === 'task') {
     const t = T(UI.openTask), v = el.value; if (v === 'keep') return;
     if (v === 'date') { UI.pickDate = true; $('#drawer').dataset.id = ''; renderDrawer(); const di = $('#dlDate'); if (di) { di.focus(); try { di.showPicker(); } catch (er) {} } return; }
@@ -2732,7 +3093,7 @@ document.addEventListener('keydown', e => {
     if (el.id === 'renameInput') { el.blur(); return; }
     if (el.dataset.add && el.value.trim()) {
       e.preventDefault();
-      if (el.dataset.add === 'goal') { if (!addGoal(UI.focus, el.value.trim())) toast('That is as deep as goals go. Add tasks here instead.'); } else addTask({ goal_id: UI.focus, title: el.value.trim() });
+      if (el.dataset.add === 'goal') { if (!addGoal(PG(), el.value.trim())) toast('That is as deep as goals go. Add tasks here instead.'); } else addTask({ goal_id: PG(), title: el.value.trim() });
       el.value = ''; render(); return;
     }
     if (el.id === 'addStep' && el.value.trim()) { const t = T(UI.openTask); updateTask(t, { steps: (t.steps || []).concat([{ id: uid(), t: el.value.trim(), done: false }]) }); el.value = ''; $('#drawer').dataset.id = ''; render(); return; }
@@ -2782,7 +3143,7 @@ function dropTargetAt(x, y, d) {
 $('#stage').addEventListener('pointerdown', e => {
   if (e.button !== 0) return;
   const n = e.target.closest('.node.orbit'); if (!n) return;
-  const kind = n.dataset.act === 'focus' ? 'goal' : n.dataset.act === 'openTask' ? 'task' : null; if (!kind) return;
+  const kind = n.dataset.act === 'focus' ? 'goal' : n.dataset.act === 'openTask' ? 'task' : n.dataset.act === 'compose' ? 'add' : null; if (!kind) return;
   drag = { el: n, kind: kind, id: n.dataset.id, sx: e.clientX, sy: e.clientY, moved: false };
 });
 window.addEventListener('pointermove', e => {
@@ -2800,7 +3161,7 @@ window.addEventListener('pointermove', e => {
     $$('.node.drop-ok').forEach(x => x.classList.remove('drop-ok'));
     const t = dropTargetAt(d.cx, d.cy, d), here = UI.focus || null, hint = $('#dragHint');
     let msg = 'Drop to park it here';
-    if (t && t.id !== here) {
+    if (t && t.id !== here && d.kind !== 'add') {
       const ok = d.kind === 'task' || t.id === null || canMoveGoal(d.id, t.id);
       if (ok) { t.el.classList.add('drop-ok'); msg = 'Move into “' + (t.id ? G(t.id).title : rootName()) + '”'; } else msg = 'Cannot go there';
     }
@@ -2817,10 +3178,11 @@ window.addEventListener('pointerup', e => {
   $$('.node.drop-ok').forEach(x => x.classList.remove('drop-ok'));
   const t = dropTargetAt(e.clientX, e.clientY, d);
   const here = UI.focus || null;
-  if (!t || t.id === here) {
+  if (d.kind === 'add' || !t || t.id === here) {
     // dropped on empty space (or the center): lock the bubble where it was left
     const it = lastLayout && lastLayout.items.find(i => i.key === d.el.dataset.key);
-    if (it) setLayout(d.kind, d.id, { x: +clamp((it.x + e.clientX - d.sx - lastLayout.cx) / lastLayout.AX, -1, 1).toFixed(4), y: +clamp((it.y + e.clientY - d.sy - lastLayout.cy) / lastLayout.AY, -1, 1).toFixed(4) });
+    if (it && d.kind === 'add') setAddPos({ x: +clamp((it.x + e.clientX - d.sx - lastLayout.cx) / lastLayout.AX, -1, 1).toFixed(4), y: +clamp((it.y + e.clientY - d.sy - lastLayout.cy) / lastLayout.AY, -1, 1).toFixed(4) });
+    else if (it) setLayout(d.kind, d.id, { x: +clamp((it.x + e.clientX - d.sx - lastLayout.cx) / lastLayout.AX, -1, 1).toFixed(4), y: +clamp((it.y + e.clientY - d.sy - lastLayout.cy) / lastLayout.AY, -1, 1).toFixed(4) });
   } else if (t && t.id !== here) {
     if (d.kind === 'task') {
       const task = T(d.id), old = task.goal_id || null;
@@ -2867,7 +3229,11 @@ function seedExample() {
 /* =====================================================================
    BOOT (auto-detect preview vs live GitHub Pages)
    ===================================================================== */
-function startApp() { hydrateIcons(document); loadProfile(); render(); }
+function startApp() {
+  hydrateIcons(document); loadProfile();
+  try { const f = localStorage.getItem('orbit.focus'); if (f && G(f)) UI.focus = f; } catch (e) {}
+  render();
+}
 let started = false;
 async function startLive() {
   $('#auth').classList.remove('on'); $('#logoutBtn').hidden = false; setSync('saving');
