@@ -453,6 +453,14 @@ input,textarea,select{font:inherit;color:inherit}
 .trow.ghidden,.gsec.ghidden>.gsec-h,.grow-row.ghidden{opacity:.5;filter:grayscale(.8)}
 .seg-row .tools{display:flex;gap:6px;flex-wrap:wrap}
 
+.chip.clear{color:var(--muted)}
+.cr-inline{display:flex;align-items:center;gap:8px;flex-wrap:wrap;width:100%;padding:6px 2px 2px;font-size:13px;color:var(--text-2)}
+.cr-inline input{width:56px;height:30px;background:var(--surface-2);border:1px solid var(--line-2);border-radius:8px;padding:0 8px;text-align:center;color:var(--text)}
+.cr-inline .sel{height:30px}
+.cr-inline .cr-days{display:flex;gap:5px;flex-wrap:wrap}
+.cr-inline .cr-days button{width:32px;height:32px;border-radius:50%;background:var(--surface-2);border:1px solid var(--line-2);font-size:12px;font-weight:600;color:var(--text-2)}
+.cr-inline .cr-days button.on{background:var(--blue);border-color:var(--blue);color:#fff}
+
 /* ============ TOAST / AUTH / MOBILE NAV ============ */
 .toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom));transform:translate(-50%,20px);opacity:0;pointer-events:none;
   background:var(--surface-3);border:1px solid var(--line-2);border-radius:12px;padding:10px 12px 10px 16px;display:flex;align-items:center;gap:14px;z-index:70;
@@ -706,7 +714,7 @@ function firstOccurrence(r) {
 
 /* ---------------- state ---------------- */
 let S = { goals: [], lists: [], tasks: [] };
-const UI = { sel: null, showHidden: (function () { try { return localStorage.getItem('orbit.showHidden') === '1'; } catch (e) { return false; } })(), allMode: (function () { try { return localStorage.getItem('orbit.allMode') || 'tree'; } catch (e) { return 'tree'; } })(), showDoneMap: (function () { try { return localStorage.getItem('orbit.showDoneMap') === '1'; } catch (e) { return false; } })(), expanded: (function () { try { return JSON.parse(localStorage.getItem('orbit.expanded') || '{}'); } catch (e) { return {}; } })(), pickDate: false, panelOff: (function () { try { return localStorage.getItem('orbit.panelOff') === '1'; } catch (e) { return false; } })(), collapsed: (function () { try { return JSON.parse(localStorage.getItem('orbit.collapsed') || '{}'); } catch (e) { return {}; } })(), lastNav: 0, view: 'goals', focus: null, prevFocusKey: null, q: '', openTask: null, sorts: {}, showDone: {}, composer: null, burst: null, renaming: false, draft: { due: null, important: false, goal: '' } };
+const UI = { sel: null, showHidden: (function () { try { return localStorage.getItem('orbit.showHidden') === '1'; } catch (e) { return false; } })(), allMode: (function () { try { return localStorage.getItem('orbit.allMode') || 'tree'; } catch (e) { return 'tree'; } })(), showDoneMap: (function () { try { return localStorage.getItem('orbit.showDoneMap') === '1'; } catch (e) { return false; } })(), expanded: (function () { try { return JSON.parse(localStorage.getItem('orbit.expanded') || '{}'); } catch (e) { return {}; } })(), pickDate: false, panelOff: (function () { try { return localStorage.getItem('orbit.panelOff') === '1'; } catch (e) { return false; } })(), collapsed: (function () { try { return JSON.parse(localStorage.getItem('orbit.collapsed') || '{}'); } catch (e) { return {}; } })(), lastNav: 0, view: 'goals', focus: null, prevFocusKey: null, q: '', openTask: null, sorts: {}, showDone: {}, composer: null, burst: null, renaming: false, draft: { title: '', due: null, important: false, goal: '', dl: '', repeat: '' } };
 
 /* ---------------- storage (dual mode) ---------------- */
 const LS_KEY = 'orbit.v1';
@@ -1642,13 +1650,8 @@ function renderTasks() {
   const dgroup = (key, items) => '<div class="dgroup" data-group="' + key + '">' + items.map(row).join('') + '</div>';
   let h = '';
   if (!UI.q) {
-    const d = UI.draft;
-    h += '<div class="addbar ' + (d.dl || d.important || d.goal ? 'has' : '') + '"><div class="top">' + icon('plus') + '<input id="addInput" placeholder="Add a task" autocomplete="off" enterkeyhint="done"><button class="btn sm" data-act="addFromBar" type="button">Add</button></div><div class="opts">' +
-      '<label class="chip ' + (d.dl ? 'on' : '') + '">' + icon('cal', 'sm') + '<select id="draftDl" aria-label="Deadline">' + deadlineOptions(d.dl || '', null, d.due ? fmtShort(d.due) : '').replace('>No deadline<', '>Deadline<') + '</select></label>' +
-      (d.dl === 'date' ? '<label class="chip on">' + (d.due ? fmtShort(d.due) : 'Choose date') + '<input type="date" id="draftDue" value="' + (d.due || '') + '"></label>' : '') +
-      '<button class="chip ' + (d.important ? 'on' : '') + '" data-act="draftStar">' + icon('star', 'sm') + 'Important</button>' +
-      '<label class="chip ' + (d.goal ? 'on' : '') + '">' + icon('target', 'sm') + '<select id="draftGoal" aria-label="Link to goal"><option value="">Link to goal</option>' + goalOptions(d.goal) + '</select></label>' +
-      '</div></div>';
+    h += '<div class="addbar"><div class="top">' + icon('plus') + '<input id="addInput" placeholder="Add a task" autocomplete="off" enterkeyhint="done" value="' + esc(UI.draft.title || '') + '"><button class="btn sm" data-act="addFromBar" type="button">Add</button></div>' +
+      '<div class="opts" id="addOpts">' + addOptsHTML() + '</div></div>';
   }
   if (v === 'myday' && !UI.q) {
     const sug = S.tasks.filter(t => !t.done && t.my_day !== today() && t.due && !t.due_scope && dayDiff(t.due) < 0).slice(0, 6);
@@ -1688,9 +1691,9 @@ function renderTasks() {
     const shown = !!UI.showDone[v];
     h += '<button class="sec-toggle ' + (shown ? '' : 'closed') + '" data-act="toggleDone">' + icon('down', 'sm') + 'Completed <span class="mono small muted">' + done.length + '</span></button>' + (shown ? done.map(row).join('') : '');
   }
-  const ai = document.activeElement && document.activeElement.id === 'addInput' ? document.activeElement.value : null;
+  const ai = document.activeElement && document.activeElement.id === 'addInput' ? document.activeElement.selectionStart : null;
   $('#tlist').innerHTML = h;
-  if (ai !== null) { const i = $('#addInput'); i.value = ai; i.focus(); }
+  if (ai !== null) { const i = $('#addInput'); if (i) { i.focus(); try { i.setSelectionRange(ai, ai); } catch (er) {} } }
 }
 function goalTreeHTML(vk, filt) {
   filt = filt || (() => true);
@@ -1743,8 +1746,25 @@ function goalOptions(sel) {
   const walk = (id, depth) => kidsOf(id).forEach(g => { h += '<option value="' + g.id + '"' + (g.id === sel ? ' selected' : '') + '>' + '\u00a0\u00a0\u00a0'.repeat(depth) + esc(g.title) + '</option>'; walk(g.id, depth + 1); });
   walk(null, 0); return h;
 }
+/* Options under "Add a task". They live in UI.draft and redraw on their own,
+   so the title you typed is never touched. */
+function addOptsHTML() {
+  const d = UI.draft, ro = parseRepeat(d.repeat), rv = ro ? 'custom' : (d.repeat || '');
+  let h = '<label class="chip ' + (d.dl ? 'on' : '') + '">' + icon('cal', 'sm') + '<select id="draftDl" aria-label="Deadline">' + deadlineOptions(d.dl || '', null, d.due ? fmtShort(d.due) : '').replace('>No deadline<', '>Deadline<') + '</select></label>' +
+    (d.dl === 'date' ? '<label class="chip ' + (d.due ? '' : 'on') + '">' + (d.due ? 'Change date' : 'Choose date') + '<input type="date" id="draftDue" value="' + (d.due || '') + '"></label>' : '') +
+    '<label class="chip ' + (d.repeat ? 'on' : '') + '">' + icon('repeat', 'sm') + '<select id="draftRepeat" aria-label="Repeat">' +
+      Object.keys(REPEATS).map(k => '<option value="' + k + '"' + (rv === k ? ' selected' : '') + '>' + (k === '' ? 'Repeat' : k === 'custom' && ro ? esc(repeatLabel(d.repeat)) : REPEATS[k]) + '</option>').join('') + '</select></label>' +
+    '<button type="button" class="chip ' + (d.important ? 'on' : '') + '" data-act="draftStar">' + icon('star', 'sm') + 'Important</button>' +
+    '<label class="chip ' + (d.goal ? 'on' : '') + '">' + icon('target', 'sm') + '<select id="draftGoal" aria-label="Link to goal"><option value="">Link to goal</option>' + goalOptions(d.goal) + '</select></label>' +
+    (d.dl || d.repeat || d.important || d.goal ? '<button type="button" class="chip clear" data-act="draftClear">' + icon('x', 'sm') + 'Clear</button>' : '');
+  if (ro) h += '<div class="cr-inline"><span>Every</span><input type="number" min="1" max="99" id="draftRepN" value="' + ro.n + '" aria-label="Interval">' +
+    '<select class="sel" id="draftRepU" aria-label="Unit">' + [['d', 'day'], ['w', 'week'], ['m', 'month'], ['y', 'year']].map(u => '<option value="' + u[0] + '"' + (ro.u === u[0] ? ' selected' : '') + '>' + u[1] + (ro.n > 1 ? 's' : '') + '</option>').join('') + '</select>' +
+    (ro.u === 'w' ? '<span class="cr-days">' + DAYN.map((dn, i) => '<button type="button" class="' + (ro.days.indexOf(i) > -1 ? 'on' : '') + '" data-act="draftRepDay" data-d="' + i + '" title="' + dn + '" aria-label="' + dn + '">' + dn.slice(0, 2) + '</button>').join('') + '</span>' : '') + '</div>';
+  return h;
+}
+function refreshAddOpts() { const o = $('#addOpts'); if (o) o.innerHTML = addOptsHTML(); }
 function addFromBar() {
-  const inp = $('#addInput'); const v = inp.value.trim(); if (!v) return;
+  const inp = $('#addInput'); const v = inp.value.trim(); if (!v) { inp.focus(); toast('Type a task name first'); return; }
   const f = { title: v }, view = UI.view, d = UI.draft;
   if (view === 'myday') f.my_day = today();
   if (view === 'important') f.important = true;
@@ -1752,8 +1772,9 @@ function addFromBar() {
   if (view.indexOf('list:') === 0) f.list_id = view.slice(5);
   if (d.due) f.due = d.due; if (d.important) f.important = true; if (d.goal) f.goal_id = d.goal;
   if (d.dl && d.dl !== 'date') Object.assign(f, deadlineFor(d.dl)); else if (d.dl === 'date' && d.due) { f.due = d.due; f.due_scope = null; }
+  if (d.repeat) { f.repeat = d.repeat; if (!f.due) f.due = parseRepeat(d.repeat) ? firstOccurrence(d.repeat) : today(); if (parseRepeat(d.repeat)) f.due_scope = null; }
   if (view === 'myday' || view === 'myweek') { const rs = S.tasks.filter(t => t.rank != null).map(t => +t.rank); f.rank = (rs.length ? Math.min.apply(null, rs) : 1) - 1; }
-  const nt = addTask(f); inp.value = ''; UI.draft = { due: null, important: false, goal: '', dl: '' };
+  const nt = addTask(f); inp.value = ''; UI.draft = { title: '', due: null, important: false, goal: '', dl: '', repeat: '' };
   if (view === 'all') { if (nt.goal_id) pathOf(nt.goal_id).forEach(g => { UI.expanded[g.id] = true; }); else UI.expanded.__none = true; try { localStorage.setItem('orbit.expanded', JSON.stringify(UI.expanded)); } catch (er) {} }
   render(); $('#addInput').focus();
   const where = nt.goal_id ? 'in “' + G(nt.goal_id).title + '”' : nt.list_id ? 'in ' + (L(nt.list_id) || {}).name : (view === 'myday' ? 'to My Day' : 'to your tasks');
@@ -2775,7 +2796,9 @@ document.addEventListener('click', e => {
     case 'toggleDone': UI.showDone[UI.view] = !UI.showDone[UI.view]; render(); break;
     case 'draftScope': UI.draft.scope = UI.draft.scope === a.dataset.s ? null : a.dataset.s; if (UI.draft.scope) UI.draft.due = null; render(); $('#addInput').focus(); break;
     case 'quickScope': { const t = T(UI.openTask); const sc = a.dataset.s; updateTask(t, { due_scope: sc, due: sc === 'week' ? endOfWeek() : endOfMonth() }); $('#drawer').dataset.id = ''; render(); toast(sc === 'week' ? 'Due this week. It moves to the top of My Day on Thursday.' : 'Due this month. It shows in My Day and My Week during the last 7 days.'); break; }
-    case 'draftStar': UI.draft.important = !UI.draft.important; render(); $('#addInput').focus(); break;
+    case 'draftStar': UI.draft.important = !UI.draft.important; refreshAddOpts(); break;
+    case 'draftClear': Object.assign(UI.draft, { dl: '', due: null, important: false, goal: '', repeat: '' }); refreshAddOpts(); break;
+    case 'draftRepDay': { const o = parseRepeat(UI.draft.repeat); if (!o) break; const dd = +a.dataset.d, k = o.days.indexOf(dd); if (k > -1) { if (o.days.length > 1) o.days.splice(k, 1); } else o.days.push(dd); UI.draft.repeat = repeatStr(o); refreshAddOpts(); break; }
     case 'myDayToggle': { const t = T(UI.openTask); updateTask(t, { my_day: t.my_day === today() ? null : today() }); render(); break; }
     case 'quickDue': { const t = T(UI.openTask); const n = a.dataset.n; updateTask(t, { due: n === 'clear' ? null : addDays(today(), +n), due_scope: null }); $('#drawer').dataset.id = ''; render(); break; }
     case 'toggleStep': { const t = T(UI.openTask); const s = t.steps.find(x => x.id === a.dataset.sid); s.done = !s.done; updateTask(t, { steps: t.steps.slice() }); $('#drawer').dataset.id = ''; render(); break; }
@@ -3005,6 +3028,7 @@ document.addEventListener('mouseover', e => {
 });
 document.addEventListener('input', e => {
   const el = e.target;
+  if (el.id === 'addInput') { UI.draft.title = el.value; return; }
   if (el.id === 'dlgInput') { $('#dlgGo').disabled = el.value.trim() !== 'DELETE'; return; }
   if (el.id === 'addSheetInput' && UI.add) { const pos = el.selectionStart; UI.add.q = el.value; renderAddSheet(); const i = $('#addSheetInput'); i.focus(); i.setSelectionRange(pos, pos); return; }
   if (el.id === 'search') { UI.q = el.value.trim(); if (UI.q && (UI.view === 'goals' || UI.view === 'settings')) UI.view = 'all'; UI.openTask = null; render(); $('#search').focus(); return; }
@@ -3065,16 +3089,22 @@ document.addEventListener('change', e => {
   }
   if (el.id === 'draftDl') {
     UI.draft.dl = el.value; if (el.value !== 'date') UI.draft.due = null;
-    render(); if (el.value === 'date') { const di = $('#draftDue'); if (di) { try { di.showPicker(); } catch (er) { di.focus(); } } } else $('#addInput').focus();
+    refreshAddOpts(); if (el.value === 'date') { const di = $('#draftDue'); if (di) { try { di.showPicker(); } catch (er) { di.focus(); } } }
     return;
+  }
+  if (el.id === 'draftRepeat') { UI.draft.repeat = el.value === 'custom' ? 'custom:w:1:' + ((new Date().getDay() + 6) % 7) : el.value; refreshAddOpts(); return; }
+  if (el.id === 'draftRepN' || el.id === 'draftRepU') {
+    const o = parseRepeat(UI.draft.repeat); if (!o) return;
+    if (el.id === 'draftRepN') o.n = clamp(parseInt(el.value, 10) || 1, 1, 99); else { o.u = el.value; if (o.u === 'w' && !o.days.length) o.days = [(new Date().getDay() + 6) % 7]; }
+    UI.draft.repeat = repeatStr(o); refreshAddOpts(); return;
   }
   if (el.dataset.tfield && el.tagName !== 'TEXTAREA') {
     const t = T(UI.openTask); const f = el.dataset.tfield; const patch = { [f]: el.value || null }; if (f === 'due') { patch.due_scope = null; UI.pickDate = false; } if (f === 'goal_id') patch.layout = null; updateTask(t, patch);
     $('#drawer').dataset.id = ''; render(); return;
   }
   if (el.dataset.actChange === 'sort') { UI.sorts[UI.view] = el.value; renderTasks(); return; }
-  if (el.id === 'draftDue') { UI.draft.due = el.value || null; UI.draft.dl = 'date'; render(); $('#addInput').focus(); return; }
-  if (el.id === 'draftGoal') { UI.draft.goal = el.value; render(); $('#addInput').focus(); return; }
+  if (el.id === 'draftDue') { UI.draft.due = el.value || null; UI.draft.dl = 'date'; refreshAddOpts(); return; }
+  if (el.id === 'draftGoal') { UI.draft.goal = el.value; refreshAddOpts(); return; }
 });
 document.addEventListener('keydown', e => {
   const el = e.target;
