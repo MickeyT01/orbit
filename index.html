@@ -217,8 +217,7 @@ input,textarea,select{font:inherit;color:inherit}
 .addbar:focus-within{border-color:var(--blue)}
 .addbar .top{display:flex;align-items:center;gap:12px;padding:0 10px 0 14px;height:50px;color:var(--blue-2)}
 .addbar .top input{flex:1;min-width:0;background:none;border:0;outline:0;color:var(--text);font-size:14.5px}
-.addbar .opts{display:none;align-items:center;gap:6px;padding:6px 10px 8px;border-top:1px solid var(--line);flex-wrap:wrap}
-.addbar:focus-within .opts,.addbar.has .opts{display:flex}
+.addbar .opts{display:flex;align-items:center;gap:6px;padding:6px 10px 8px;border-top:1px solid var(--line);flex-wrap:wrap}
 .chip{display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 10px;border-radius:8px;border:1px solid var(--line-2);color:var(--text-2);font-size:12px;background:var(--surface-2);position:relative}
 .chip.on{color:var(--text);border-color:var(--blue)}
 .chip input[type=date]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%}
@@ -427,6 +426,23 @@ input,textarea,select{font:inherit;color:inherit}
 .cr-days button.on{background:var(--blue);border-color:var(--blue);color:#fff}
 .chip select{max-width:160px}
 
+.head-right{margin-left:auto;display:flex;gap:6px;align-items:center}
+.undo-btn:disabled{opacity:.3;cursor:default;background:none!important}
+.btn.sm{height:32px;padding:0 14px;font-size:13px}
+.addbar .top .btn.sm{flex:none}
+.addbtn{height:28px;padding:0 12px;border-radius:7px;background:var(--surface-3);border:1px solid var(--line-2);font-size:12px;font-weight:600;color:var(--text);flex:none;display:none}
+.addrow:focus-within .addbtn{display:inline-flex;align-items:center}
+.trow{border-left:3px solid var(--rh,#3a4556)}
+.seg-row{margin:2px 0 4px}
+.seg-row .seg{margin:0}
+.fgroup{margin:14px 0 4px}
+.fgroup-h{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700;color:var(--text);margin:0 0 8px 2px}
+.fgroup-h .hdot{width:10px;height:10px}
+#dragHint{position:fixed;z-index:70;pointer-events:none;padding:6px 10px;border-radius:8px;background:var(--surface-3);border:1px solid var(--line-2);font-size:12px;font-weight:600;white-space:nowrap;opacity:0;transform:translateY(4px);transition:opacity .12s,transform .12s;box-shadow:0 10px 24px -8px rgba(0,0,0,.6)}
+#dragHint.on{opacity:1;transform:none}
+.node.dragging{will-change:transform}
+.node.dragging .body{transform:scale(1.06)}
+
 /* ============ TOAST / AUTH / MOBILE NAV ============ */
 .toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom));transform:translate(-50%,20px);opacity:0;pointer-events:none;
   background:var(--surface-3);border:1px solid var(--line-2);border-radius:12px;padding:10px 12px 10px 16px;display:flex;align-items:center;gap:14px;z-index:70;
@@ -493,6 +509,7 @@ input,textarea,select{font:inherit;color:inherit}
   .step .x{opacity:1}
   .grip{opacity:.8;width:26px}
   .stage-tools{left:12px;right:auto;bottom:10px}
+  .addbtn{display:inline-flex;align-items:center}
   #rsBar{font-size:11.5px;padding-left:10px}
   .addsheet{left:0;right:0;top:auto;bottom:0;width:100%;max-height:88vh;transform:translateY(100%);border-radius:18px 18px 0 0;padding-bottom:env(safe-area-inset-bottom)}
   .addsheet.on{transform:none}
@@ -530,6 +547,7 @@ input,textarea,select{font:inherit;color:inherit}
         <div class="ghead">
           <button class="iconbtn menu-btn" data-act="openSide" aria-label="Open menu"><svg class="ic" data-i="menu"></svg></button>
           <div class="h1">Goals</div>
+          <span class="head-right"><button class="iconbtn undo-btn" data-act="undo" aria-label="Undo" title="Undo (Ctrl+Z)" disabled><svg class="ic" data-i="undo"></svg></button></span>
           <div class="crumbs" id="crumbs"></div>
         </div>
         <div class="stage" id="stage" tabindex="-1" aria-label="Goal map">
@@ -674,7 +692,7 @@ function firstOccurrence(r) {
 
 /* ---------------- state ---------------- */
 let S = { goals: [], lists: [], tasks: [] };
-const UI = { showDoneMap: (function () { try { return localStorage.getItem('orbit.showDoneMap') === '1'; } catch (e) { return false; } })(), expanded: (function () { try { return JSON.parse(localStorage.getItem('orbit.expanded') || '{}'); } catch (e) { return {}; } })(), pickDate: false, panelOff: (function () { try { return localStorage.getItem('orbit.panelOff') === '1'; } catch (e) { return false; } })(), collapsed: (function () { try { return JSON.parse(localStorage.getItem('orbit.collapsed') || '{}'); } catch (e) { return {}; } })(), lastNav: 0, view: 'goals', focus: null, prevFocusKey: null, q: '', openTask: null, sorts: {}, showDone: {}, composer: null, burst: null, renaming: false, draft: { due: null, important: false, goal: '' } };
+const UI = { allMode: (function () { try { return localStorage.getItem('orbit.allMode') || 'tree'; } catch (e) { return 'tree'; } })(), showDoneMap: (function () { try { return localStorage.getItem('orbit.showDoneMap') === '1'; } catch (e) { return false; } })(), expanded: (function () { try { return JSON.parse(localStorage.getItem('orbit.expanded') || '{}'); } catch (e) { return {}; } })(), pickDate: false, panelOff: (function () { try { return localStorage.getItem('orbit.panelOff') === '1'; } catch (e) { return false; } })(), collapsed: (function () { try { return JSON.parse(localStorage.getItem('orbit.collapsed') || '{}'); } catch (e) { return {}; } })(), lastNav: 0, view: 'goals', focus: null, prevFocusKey: null, q: '', openTask: null, sorts: {}, showDone: {}, composer: null, burst: null, renaming: false, draft: { due: null, important: false, goal: '' } };
 
 /* ---------------- storage (dual mode) ---------------- */
 const LS_KEY = 'orbit.v1';
@@ -693,12 +711,14 @@ const Store = {
   loadLocal() { try { const raw = localStorage.getItem(LS_KEY); if (raw) { const d = JSON.parse(raw); S.goals = d.goals || []; S.lists = d.lists || []; S.tasks = d.tasks || []; return true; } } catch (e) {} return false; },
   persistLocal() { try { localStorage.setItem(LS_KEY, JSON.stringify(S)); } catch (e) {} },
   save(table, row, delay) {
+    commitSnapshot();
     if (!this.live) { this.persistLocal(); return; }
     const k = table + row.id; clearTimeout(this.timers[k]);
     const go = () => { delete this.timers[k]; this.enqueue(() => this.sb.from(table).upsert(clean(table, row))); };
     if (delay) { this.timers[k] = setTimeout(go, delay); setSync('saving'); } else go();
   },
   del(table, id) {
+    commitSnapshot();
     if (!this.live) { this.persistLocal(); return; }
     clearTimeout(this.timers[table + id]);
     this.enqueue(() => this.sb.from(table).delete().eq('id', id));
@@ -856,20 +876,31 @@ function moveOptions(g) {
   return h;
 }
 function updateGoal(g, patch, delay) { Object.assign(g, patch); Store.save('goals', g, delay); }
-function deleteGoal(id) {
+function deleteGoal(id, confirmed) {
   const g = G(id); if (!g) return;
-  const ids = descIds(id);
-  const snapshot = { goals: S.goals.filter(x => ids.indexOf(x.id) >= 0).map(x => Object.assign({}, x)), taskLinks: S.tasks.filter(t => ids.indexOf(t.goal_id) >= 0).map(t => [t.id, t.goal_id]) };
+  const ids = descIds(id), tks = S.tasks.filter(t => ids.indexOf(t.goal_id) > -1);
+  if (!confirmed && (ids.length > 1 || tks.length)) {
+    $('#dlg').innerHTML = '<h3>Delete \u201c' + esc(g.title) + '\u201d?</h3><p class="small muted">Everything inside it goes too: ' + (ids.length - 1) + ' sub-goal' + (ids.length - 1 === 1 ? '' : 's') + ' and ' + tks.length + ' task' + (tks.length === 1 ? '' : 's') + '. You can undo this right after.</p>' +
+      '<div class="row"><button class="btn ghost" data-act="dlgClose">Cancel</button><button class="btn dangerfill" data-act="delGoalGo" data-id="' + id + '">Delete all of it</button></div>';
+    $('#dlg').classList.add('on'); $('#dlgScrim').classList.add('on'); return;
+  }
   if (ids.indexOf(UI.focus) >= 0) setFocusRaw(g.parent_id || null);
+  if (UI.openTask && tks.some(t => t.id === UI.openTask)) UI.openTask = null;
+  tks.forEach(t => Store.del('tasks', t.id));
+  S.tasks = S.tasks.filter(t => ids.indexOf(t.goal_id) < 0);
   S.goals = S.goals.filter(x => ids.indexOf(x.id) < 0);
-  S.tasks.forEach(t => { if (ids.indexOf(t.goal_id) >= 0) t.goal_id = null; });
   Store.del('goals', id);
   render();
-  toast('Deleted "' + g.title + '"', () => {
-    snapshot.goals.sort((a, b) => a.tier - b.tier).forEach(x => { S.goals.push(x); Store.save('goals', x); });
-    snapshot.taskLinks.forEach(p => { const t = T(p[0]); if (t) { t.goal_id = p[1]; Store.save('tasks', t); } });
-    render();
-  });
+  toast('Deleted \u201c' + g.title + '\u201d' + (ids.length > 1 || tks.length ? ' and everything inside it' : ''), true);
+}
+function setAchieved(id, val) {
+  const g = G(id); if (!g) return;
+  if (!val) { updateGoal(g, { done: false }); render(); return; }
+  const ids = descIds(id); let nt = 0;
+  ids.forEach(x => { const gg = G(x); if (!gg.done) updateGoal(gg, { done: true }); });
+  S.tasks.forEach(t => { if (ids.indexOf(t.goal_id) > -1 && !t.done) { updateTask(t, { done: true, done_at: nowIso() }); nt++; } });
+  render();
+  toast('\u201c' + g.title + '\u201d achieved' + (ids.length > 1 || nt ? ', with ' + (ids.length - 1) + ' sub-goals and ' + nt + ' tasks' : ''), true);
 }
 function addTask(fields) {
   const t = Object.assign({ id: uid(), list_id: null, goal_id: null, title: '', note: '', done: false, done_at: null, important: false, due: null, my_day: null, repeat: null, steps: [], sort: Date.now(), created_at: nowIso() }, fields);
@@ -919,10 +950,53 @@ function deleteTask(id) {
   toast('Deleted "' + (copy.title || 'task') + '"', () => { S.tasks.push(copy); Store.save('tasks', copy); render(); });
 }
 
+/* ---------------- undo history (last 10 actions) ----------------
+   A copy of the data is taken at the start of every user event; the first save or
+   delete in that event commits it to history. Typing in one field groups into one step. */
+const HIST = []; let snapPending = null, snapCommitted = true, undoing = false, curEvt = null, lastCommit = null;
+const cloneS = () => JSON.parse(JSON.stringify({ goals: S.goals, lists: S.lists, tasks: S.tasks }));
+['pointerdown', 'keydown', 'change', 'click'].forEach(ev => document.addEventListener(ev, e => {
+  if (undoing) return;
+  if (ev === 'keydown' && (e.key === 'Shift' || e.key === 'Control' || e.key === 'Meta' || e.key === 'Alt')) return;
+  const tgt = e.target, isText = tgt && tgt.matches && tgt.matches('input[type=text],input:not([type]),input[type=number],textarea');
+  curEvt = { t: tgt, text: !!isText, time: Date.now() };
+  snapPending = cloneS(); snapCommitted = false;
+}, true));
+function commitSnapshot() {
+  if (undoing || snapCommitted || !snapPending) return;
+  snapCommitted = true;
+  if (curEvt && curEvt.text && lastCommit && lastCommit.t === curEvt.t && Date.now() - lastCommit.time < 5000) { lastCommit.time = Date.now(); return; }
+  HIST.push(snapPending); if (HIST.length > 10) HIST.shift();
+  lastCommit = curEvt ? { t: curEvt.t, text: curEvt.text, time: Date.now() } : null;
+  updateUndoBtns();
+}
+function updateUndoBtns() { $$('.undo-btn').forEach(b => { b.disabled = !HIST.length; b.title = HIST.length ? 'Undo (Ctrl+Z), ' + HIST.length + ' step' + (HIST.length === 1 ? '' : 's') + ' available' : 'Nothing to undo'; }); }
+function undoLast() {
+  const snap = HIST.pop(); if (!snap) { toast('Nothing to undo'); return; }
+  undoing = true;
+  const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+  const idx = arr => { const m = new Map(); arr.forEach(r => m.set(r.id, r)); return m; };
+  const cur = { goals: idx(S.goals), lists: idx(S.lists), tasks: idx(S.tasks) }, old = { goals: idx(snap.goals), lists: idx(snap.lists), tasks: idx(snap.tasks) };
+  S.tasks.forEach(r => { if (!old.tasks.has(r.id)) Store.del('tasks', r.id); });
+  S.goals.slice().sort((a, b) => b.tier - a.tier).forEach(r => { if (!old.goals.has(r.id)) Store.del('goals', r.id); });
+  S.lists.forEach(r => { if (!old.lists.has(r.id)) Store.del('lists', r.id); });
+  snap.lists.forEach(r => { if (!cur.lists.has(r.id) || !same(cur.lists.get(r.id), r)) Store.save('lists', r); });
+  snap.goals.slice().sort((a, b) => a.tier - b.tier).forEach(r => { if (!cur.goals.has(r.id) || !same(cur.goals.get(r.id), r)) Store.save('goals', r); });
+  snap.tasks.forEach(r => { if (!cur.tasks.has(r.id) || !same(cur.tasks.get(r.id), r)) Store.save('tasks', r); });
+  S.goals = snap.goals; S.lists = snap.lists; S.tasks = snap.tasks;
+  if (UI.focus && !G(UI.focus)) UI.focus = null;
+  if (UI.openTask && !T(UI.openTask)) UI.openTask = null;
+  if (UI.view.indexOf('list:') === 0 && !L(UI.view.slice(5))) UI.view = 'myday';
+  Store.persistLocal(); undoing = false;
+  $('#drawer').dataset.id = ''; render(); updateUndoBtns();
+  toast('Undone' + (HIST.length ? ' (' + HIST.length + ' more available)' : ''));
+}
+const undoBtnHTML = () => '<button class="iconbtn undo-btn" data-act="undo" aria-label="Undo" title="Undo (Ctrl+Z)"' + (HIST.length ? '' : ' disabled') + '>' + icon('undo') + '</button>';
+
 /* ---------------- toast ---------------- */
 let toastTimer, toastUndo;
 function toast(msg, undo) {
-  $('#toastMsg').textContent = msg; toastUndo = undo; $('#toastUndo').style.display = undo ? '' : 'none';
+  $('#toastMsg').textContent = msg; toastUndo = undo ? undoLast : null; $('#toastUndo').style.display = undo && HIST.length ? '' : 'none';
   $('#toast').classList.add('on'); clearTimeout(toastTimer); toastTimer = setTimeout(() => $('#toast').classList.remove('on'), 4200);
 }
 $('#toastUndo').onclick = () => { $('#toast').classList.remove('on'); if (toastUndo) { const u = toastUndo; toastUndo = null; u(); } };
@@ -931,7 +1005,7 @@ $('#toastUndo').onclick = () => { $('#toast').classList.remove('on'); if (toastU
    RENDER
    ===================================================================== */
 function render() {
-  invalidate();
+  invalidate(); setTimeout(updateUndoBtns, 0);
   renderSide(); renderBnav();
   $('#goalsView').classList.toggle('on', UI.view === 'goals');
   $('#settingsView').classList.toggle('on', UI.view === 'settings');
@@ -1015,11 +1089,9 @@ function inWeek(t) { const w = weekRange(); return t.my_day === today() || deadl
 const SMART = [
   { v: 'myday', name: 'My Day', ic: 'sun', c: 'c-day', f: t => t.my_day === today() || deadlineActive(t) || (!t.due_scope && t.due === today()) },
   { v: 'myweek', name: 'My Week', ic: 'week', c: 'c-plan', f: inWeek },
-  { v: 'linked', name: 'By goal', ic: 'layers', c: 'c-link', f: t => !!t.goal_id },
   { v: 'important', name: 'Important', ic: 'star', c: 'c-imp', f: t => t.important },
   { v: 'planned', name: 'Planned', ic: 'cal', c: 'c-plan', f: t => !!t.due },
-  { v: 'all', name: 'All', ic: 'list', c: 'c-all', f: () => true },
-  { v: 'inbox', name: 'Tasks', ic: 'home', c: 'c-plan', f: t => !t.list_id }
+  { v: 'all', name: 'All tasks', ic: 'layers', c: 'c-link', f: () => true }
 ];
 function viewFilter(v) { const s = SMART.find(x => x.v === v); if (s) return s.f; const id = v.slice(5); return t => t.list_id === id; }
 function openCount(v) { const f = viewFilter(v); return S.tasks.filter(t => !t.done && f(t)).length; }
@@ -1040,7 +1112,7 @@ function renderSide() {
   if (had) { const i = $('#newList'); i.value = val; i.focus(); }
 }
 function renderBnav() {
-  const items = [['goals', 'target', 'Goals'], ['myday', 'sun', 'My Day'], ['myweek', 'week', 'My Week'], ['linked', 'layers', 'By goal'], ['menu', 'menu', 'More']];
+  const items = [['goals', 'target', 'Goals'], ['myday', 'sun', 'My Day'], ['myweek', 'week', 'My Week'], ['all', 'layers', 'All tasks'], ['menu', 'menu', 'More']];
   $('#bnav').innerHTML = items.map(i => '<button class="' + (UI.view === i[0] ? 'on' : '') + '" data-act="' + (i[0] === 'menu' ? 'openSide' : 'view') + '" data-v="' + i[0] + '">' + icon(i[1]) + i[2] + '</button>').join('');
 }
 
@@ -1072,7 +1144,13 @@ function lineCount(title, px, wt, maxW) {
   return lines;
 }
 /* Smallest radius (then smallest font) where the whole title fits inside the circle. */
+const FIT_CACHE = new Map();
 function fitText(title, fonts, wt, extraH, rMin, rMax) {
+  const ck = title + '|' + fonts.join(',') + '|' + wt + '|' + extraH + '|' + Math.round(rMin) + '|' + Math.round(rMax);
+  if (FIT_CACHE.has(ck)) return FIT_CACHE.get(ck);
+  const res = fitTextRaw(title, fonts, wt, extraH, rMin, rMax); FIT_CACHE.set(ck, res); return res;
+}
+function fitTextRaw(title, fonts, wt, extraH, rMin, rMax) {
   for (const px of fonts) for (let r = rMin; r <= rMax; r += 2) {
     if (lineCount(title, px, wt, r * 1.3) * px * 1.2 + extraH <= r * 1.28) return { r: r, fs: px };
   }
@@ -1183,6 +1261,21 @@ function computeLayout() {
     it.r *= sc; if (it.fs) it.fs *= sc;
   });
   rings.forEach(r => { r.rx *= sc; r.ry *= sc; });
+  const fixed = [center].concat(orbit.filter(x => x.pin)), movable = orbit.filter(x => !x.pin);
+  if (fixed.length > 1) {
+    for (let iter = 0; iter < 40; iter++) {
+      let moved = false;
+      movable.forEach(a => {
+        fixed.concat(movable).forEach(b => {
+          if (a === b) return;
+          const dx = a.x - b.x, dy = a.y - b.y, d = Math.hypot(dx, dy) || 0.01, min = a.r + b.r + 10;
+          if (d < min) { const push = (min - d) * (movable.indexOf(b) > -1 ? 0.5 : 1); a.x += dx / d * push; a.y += dy / d * push; moved = true; }
+        });
+        a.x = clamp(a.x, a.r + 4, W - a.r - 4); a.y = clamp(a.y, a.r + 4, H - a.r - 4);
+      });
+      if (!moved) break;
+    }
+  }
   if (fg) { const pr = small ? 20 : 26; items.push({ key: fg.parent_id || 'root', id: fg.parent_id, kind: fg.parent_id ? 'goal' : 'root', role: 'parent', x: pr + 16, y: pr + 14, r: pr }); }
   items.forEach(it => {
     if (it.kind === 'goal') it.hue = hueOf(G(it.id));
@@ -1386,7 +1479,8 @@ function taskRowHTML(t, opts) {
   if (t.note) meta.push('<span class="meta">' + icon('note') + '</span>');
   const pg = t.goal_id && opts.showGoal !== false ? G(t.goal_id) : null;
   const pathLine = pg ? '<div class="tpath" title="' + esc(goalPathText(pg.id, true)) + '"><i class="hdot" style="--h:' + hueOf(pg) + '"></i><span>' + esc(goalPathText(pg.id)) + '</span></div>' : '';
-  return '<div class="trow ' + (t.done ? 'done ' : '') + (UI.openTask === t.id ? 'open' : '') + '" data-act="openTask" data-id="' + t.id + '">' +
+  const rowHue = t.goal_id && G(t.goal_id) ? hueOf(G(t.goal_id)) : '#3a4556';
+  return '<div class="trow ' + (t.done ? 'done ' : '') + (UI.openTask === t.id ? 'open' : '') + '" data-act="openTask" data-id="' + t.id + '" style="--rh:' + rowHue + '">' +
     (opts.drag && !t.done ? '<span class="grip" aria-label="Drag to reorder" title="Drag to reorder">' + icon('grip') + '</span>' : '') +
     '<button class="chk" data-act="toggleTask" data-id="' + t.id + '" aria-label="' + (t.done ? 'Mark not complete' : 'Mark complete') + '">' + icon('check') + '</button>' +
     '<div class="tmain"><div class="ttitle">' + esc(t.title) + '</div>' + pathLine + (meta.length ? '<div class="tmeta">' + meta.join('') + '</div>' : '') + '</div>' +
@@ -1414,7 +1508,7 @@ function renderPanel() {
       '<div class="card"><div class="frow">' + icon('note') + '<div class="grow"><textarea rows="2" data-rootfield="note" placeholder="What this is all for">' + esc(PROFILE.note) + '</textarea></div></div></div>' +
       (ms ? '<div><div class="pbar"><i style="width:' + p + '%"></i></div><div class="pstat"><span>' + p + '% overall</span><span>' + bt.filter(t => t.done).length + '/' + bt.length + ' goal tasks done</span></div></div>' : '') +
       '<section><div class="sec-h">Goals <span class="n">' + vs.length + '</span></div>' + vs.map(goalRowHTML).join('') +
-      '<label class="addrow">' + icon('plus') + '<input data-add="goal" placeholder="Add a goal" autocomplete="off"></label></section>' +
+      '<label class="addrow">' + icon('plus') + '<input data-add="goal" placeholder="Add a goal" autocomplete="off"><button class="addbtn" data-act="addRow" type="button">Add</button></label></section>' +
       '<button class="btn ghost" data-act="openAdd" data-t="goal">' + icon('sparkle', 'sm') + 'Browse goal ideas</button>' +
       (floating ? '<button class="grow-row" data-act="view" data-v="all"><i class="hdot" style="--h:#8b98a9"></i><span class="t">' + floating + ' unassigned task' + (floating === 1 ? '' : 's') + ' floating on the map</span>' + icon('right', 'sm muted') + '</button>' : '') +
       '<p class="small muted">How progress works: a goal\'s percent is the average of what is inside it. Sub-goals count by their own percent, tasks count once checked off (steps give partial credit), and repeating tasks are left out because they are habits. A goal with nothing inside yet shows no percent. For goals like saving money or reading books, switch it to track a number instead.</p><p class="small muted">Tips: tap a goal to go deeper, double-click it for details, tap a task for details. Right-click or long-press any bubble for quick options, including Adjust size. Drag a bubble onto a goal to move it inside, or onto empty space to park it there. Reset layout puts bubbles back in orbit.</p>';
@@ -1439,9 +1533,9 @@ function renderPanel() {
       '</div>' +
       '<button class="btn ' + (g.done ? 'good' : 'ghost') + '" data-act="achieve">' + icon('check', 'sm') + (g.done ? 'Achieved' : 'Mark achieved') + '</button>';
     if (g.tier < MAX_DEPTH) h += '<section><div class="sec-h">Sub-goals <span class="n">' + kids.length + '</span></div>' + kids.map(goalRowHTML).join('') +
-      '<label class="addrow">' + icon('plus') + '<input data-add="goal" placeholder="Add a sub-goal" autocomplete="off"></label></section>';
+      '<label class="addrow">' + icon('plus') + '<input data-add="goal" placeholder="Add a sub-goal" autocomplete="off"><button class="addbtn" data-act="addRow" type="button">Add</button></label></section>';
     h += '<section id="panelTasks"><div class="sec-h">Tasks <span class="n">' + ts.filter(t => !t.done).length + ' open</span></div>' + ts.map(t => taskRowHTML(t, { showGoal: false })).join('') +
-      '<label class="addrow">' + icon('plus') + '<input data-add="task" placeholder="Add a task" autocomplete="off"></label></section>' +
+      '<label class="addrow">' + icon('plus') + '<input data-add="task" placeholder="Add a task" autocomplete="off"><button class="addbtn" data-act="addRow" type="button">Add</button></label></section>' +
       '<button class="btn ghost" data-act="openAdd">' + icon('sparkle', 'sm') + 'Suggestions for this ' + levelName(g.tier).toLowerCase() + '</button>' +
       '<button class="btn danger" data-act="delGoal">' + icon('trash', 'sm') + 'Delete ' + levelName(g.tier).toLowerCase() + '</button>';
   }
@@ -1459,9 +1553,7 @@ function viewTitle(v) {
   if (UI.q) return { title: 'Search', sub: 'Results for "' + UI.q + '"' };
   const s = SMART.find(x => x.v === v);
   if (v === 'myday') return { title: 'My Day', sub: fmtLong(today()) };
-  if (v === 'linked') return { title: 'By goal', sub: 'Every goal and sub-goal with its tasks' };
-  if (v === 'all') return { title: 'All', sub: 'Every task, grouped by goal. Tap a goal to open it.' };
-  if (v === 'inbox') return { title: 'Tasks', sub: 'Tasks not in a custom list, grouped by goal' };
+  if (v === 'all') return { title: 'All tasks', sub: UI.allMode === 'list' ? 'Every task in one list, grouped and color coded by goal' : 'Every goal and sub-goal with its tasks. Tap a goal to open it.' };
   if (v === 'myweek') { const w = weekRange(); return { title: 'My Week', sub: fmtShort(w[0]) + ' to ' + fmtShort(w[1]) }; }
   if (s) return { title: s.name, sub: '' };
   const l = L(v.slice(5)); return { title: l ? l.name : 'List', sub: '', list: l };
@@ -1483,24 +1575,24 @@ function renderTasks() {
   if (meta.list && UI.renaming) head += '<div class="h1"><input id="renameInput" value="' + esc(meta.list.name) + '" aria-label="List name"></div>';
   else head += '<div class="h1">' + esc(meta.title) + '</div>';
   head += (meta.sub ? '<div class="tsub">' + esc(meta.sub) + '</div>' : '') + '</div><div class="tools">';
-  if (!UI.q && ['linked', 'myweek', 'myday', 'all', 'inbox'].indexOf(v) < 0) head += '<label class="chip" title="Sort">' + icon('sort', 'sm') + '<select data-act-change="sort" aria-label="Sort">' +
+  if (!UI.q && ['myweek', 'myday', 'all'].indexOf(v) < 0) head += '<label class="chip" title="Sort">' + icon('sort', 'sm') + '<select data-act-change="sort" aria-label="Sort">' +
     [['created', 'Newest'], ['due', 'Due date'], ['important', 'Importance'], ['alpha', 'A to Z']].map(o => '<option value="' + o[0] + '"' + (o[0] === sortMode ? ' selected' : '') + '>' + o[1] + '</option>').join('') + '</select></label>';
   if (meta.list) head += '<button class="iconbtn" data-act="renameList" title="Rename list">' + icon('pencil') + '</button><button class="iconbtn" data-act="deleteList" title="Delete list">' + icon('trash') + '</button>';
-  head += '</div>';
+  head += undoBtnHTML() + '</div>';
   $('#thead').innerHTML = head;
   if (UI.renaming) { const r = $('#renameInput'); if (r) { r.focus(); r.select(); } }
 
   let arr = UI.q ? S.tasks.filter(t => (t.title + ' ' + (t.note || '')).toLowerCase().indexOf(UI.q.toLowerCase()) >= 0) : S.tasks.filter(viewFilter(v));
   const open = sortTasks(arr.filter(t => !t.done), sortMode), done = arr.filter(t => t.done).sort((a, b) => String(b.done_at).localeCompare(String(a.done_at)));
-  const showList = v !== 'inbox' && v.indexOf('list:') !== 0;
+  const showList = v.indexOf('list:') !== 0;
   const manual = (v === 'myday' || v === 'myweek') && !UI.q;
   if (manual) open.sort(byRank);
   const row = t => taskRowHTML(t, { showList: showList, view: v, drag: manual });
   const dgroup = (key, items) => '<div class="dgroup" data-group="' + key + '">' + items.map(row).join('') + '</div>';
   let h = '';
-  if (!UI.q && v !== 'linked') {
+  if (!UI.q) {
     const d = UI.draft;
-    h += '<div class="addbar ' + (d.dl || d.important || d.goal ? 'has' : '') + '"><div class="top">' + icon('plus') + '<input id="addInput" placeholder="Add a task" autocomplete="off"></div><div class="opts">' +
+    h += '<div class="addbar ' + (d.dl || d.important || d.goal ? 'has' : '') + '"><div class="top">' + icon('plus') + '<input id="addInput" placeholder="Add a task" autocomplete="off" enterkeyhint="done"><button class="btn sm" data-act="addFromBar" type="button">Add</button></div><div class="opts">' +
       '<label class="chip ' + (d.dl ? 'on' : '') + '">' + icon('cal', 'sm') + '<select id="draftDl" aria-label="Deadline">' + deadlineOptions(d.dl || '', null, d.due ? fmtShort(d.due) : '').replace('>No deadline<', '>Deadline<') + '</select></label>' +
       (d.dl === 'date' ? '<label class="chip on">' + (d.due ? fmtShort(d.due) : 'Choose date') + '<input type="date" id="draftDue" value="' + (d.due || '') + '"></label>' : '') +
       '<button class="chip ' + (d.important ? 'on' : '') + '" data-act="draftStar">' + icon('star', 'sm') + 'Important</button>' +
@@ -1512,8 +1604,9 @@ function renderTasks() {
     if (sug.length) h += '<div class="suggest"><div class="sec-h" style="margin:0 0 4px">' + icon('sun', 'sm c-day') + 'Suggested for today</div>' + sug.map(t =>
       '<div class="srow"><span class="t">' + esc(t.title) + '</span><span class="small ' + (dayDiff(t.due) < 0 ? 'meta over' : 'muted') + '">' + (dayDiff(t.due) < 0 ? 'Overdue' : 'Due today') + '</span><button class="chip" data-act="toMyDay" data-id="' + t.id + '">' + icon('plus', 'sm') + 'Add</button></div>').join('') + '</div>';
   }
-  if ((v === 'linked' || v === 'all' || v === 'inbox') && !UI.q) {
-    h += goalTreeHTML(v, v === 'inbox' ? (t => !t.list_id) : null);
+  if (v === 'all' && !UI.q) {
+    h += '<div class="seg-row"><div class="seg">' + [['tree', 'By goal'], ['list', 'List']].map(m => '<button data-act="allMode" data-m="' + m[0] + '" class="' + ((UI.allMode || 'tree') === m[0] ? 'on' : '') + '">' + m[1] + '</button>').join('') + '</div></div>';
+    h += UI.allMode === 'list' ? flatGroupedHTML(v) : goalTreeHTML(v);
     $('#tlist').innerHTML = h; return;
   }
   if (!open.length && !done.length) {
@@ -1557,7 +1650,7 @@ function goalTreeHTML(vk, filt) {
     let x = '<div class="gsec" style="--h:' + hueOf(g) + '"><div class="gsec-h ' + (closed ? 'closed' : '') + '" data-act="toggleSec" data-id="' + g.id + '" role="button" tabindex="0">' + icon('down', 'sm chev') + '<i class="hdot"></i><span class="t">' + esc(g.title) + '</span>' +
       (val ? '<span class="v mono">' + esc(val) + '</span>' : '') + '<span class="n mono">' + open + ' open</span><button class="iconbtn sm" data-act="openGoalMap" data-id="' + g.id + '" title="Open on the goal map" aria-label="Open on the goal map">' + icon('target', 'sm') + '</button></div>';
     if (!closed) x += '<div class="gsec-b">' + ts.map(t => taskRowHTML(t, { showGoal: false, view: 'linked', showList: true })).join('') + kidsOf(g.id).map(sec).join('') +
-      '<label class="addrow slim">' + icon('plus') + '<input data-addtask-goal="' + g.id + '" placeholder="Add a task" autocomplete="off"></label></div>';
+      '<label class="addrow slim">' + icon('plus') + '<input data-addtask-goal="' + g.id + '" placeholder="Add a task" autocomplete="off"><button class="addbtn" data-act="addRow" type="button">Add</button></label></div>';
     return x + '</div>';
   };
   const tops = kidsOf(null);
@@ -1569,6 +1662,24 @@ function goalTreeHTML(vk, filt) {
     h += '<div class="gsec" style="--h:#8b98a9"><div class="gsec-h ' + (closed ? 'closed' : '') + '" data-act="toggleSec" data-id="__none" role="button" tabindex="0">' + icon('down', 'sm chev') + '<i class="hdot"></i><span class="t">No goal yet</span><span class="n mono">' + loose.filter(t => !t.done).length + ' open</span></div>' +
       (closed ? '' : '<div class="gsec-b">' + loose.map(t => taskRowHTML(t, { view: 'linked', showList: true })).join('') + '</div>') + '</div>';
   }
+  return h;
+}
+function flatGroupedHTML(vk) {
+  const showDone = !!UI.showDone[vk];
+  let h = '<button class="sec-toggle ' + (showDone ? '' : 'closed') + '" data-act="toggleDone" style="margin-top:4px">' + icon('down', 'sm') + (showDone ? 'Hide completed tasks' : 'Show completed tasks') + '</button>';
+  const ord = (a, b) => (a.done - b.done) || String(a.due || '9').localeCompare(String(b.due || '9'));
+  const groups = kidsOf(null).map(g => {
+    const list = []; (function walk(id) { tasksOf(id).slice().sort(ord).forEach(t => list.push(t)); kidsOf(id).forEach(k => walk(k.id)); })(g.id);
+    return { title: g.title, hue: hueOf(g), tasks: list.filter(t => showDone || !t.done) };
+  });
+  groups.push({ title: 'No goal yet', hue: '#8b98a9', tasks: S.tasks.filter(t => !t.goal_id && (showDone || !t.done)).sort(ord) });
+  let any = false;
+  groups.forEach(gr => {
+    if (!gr.tasks.length) return; any = true;
+    h += '<div class="fgroup" style="--h:' + gr.hue + '"><div class="fgroup-h"><i class="hdot"></i>' + esc(gr.title) + ' <span class="mono small muted">' + gr.tasks.filter(t => !t.done).length + ' open</span></div>' +
+      gr.tasks.map(t => taskRowHTML(t, { view: vk, showList: true })).join('') + '</div>';
+  });
+  if (!any) h += '<div class="empty"><div class="big">No tasks yet</div>Add one above, or add tasks to goals on the Goals map.</div>';
   return h;
 }
 function goalPathText(gid, full) { const p = pathOf(gid).map(x => x.title); return !full && p.length > 2 ? p[0] + ' › … › ' + p[p.length - 1] : p.join(' › '); }
@@ -1587,8 +1698,11 @@ function addFromBar() {
   if (d.due) f.due = d.due; if (d.important) f.important = true; if (d.goal) f.goal_id = d.goal;
   if (d.dl && d.dl !== 'date') Object.assign(f, deadlineFor(d.dl)); else if (d.dl === 'date' && d.due) { f.due = d.due; f.due_scope = null; }
   if (view === 'myday' || view === 'myweek') { const rs = S.tasks.filter(t => t.rank != null).map(t => +t.rank); f.rank = (rs.length ? Math.min.apply(null, rs) : 1) - 1; }
-  addTask(f); inp.value = ''; UI.draft = { due: null, important: false, goal: '', dl: '' };
+  const nt = addTask(f); inp.value = ''; UI.draft = { due: null, important: false, goal: '', dl: '' };
+  if (view === 'all') { if (nt.goal_id) pathOf(nt.goal_id).forEach(g => { UI.expanded[g.id] = true; }); else UI.expanded.__none = true; try { localStorage.setItem('orbit.expanded', JSON.stringify(UI.expanded)); } catch (er) {} }
   render(); $('#addInput').focus();
+  const where = nt.goal_id ? 'in “' + G(nt.goal_id).title + '”' : nt.list_id ? 'in ' + (L(nt.list_id) || {}).name : (view === 'myday' ? 'to My Day' : 'to your tasks');
+  toast('Added “' + nt.title + '” ' + where, true);
 }
 
 /* ---------------- task drawer ---------------- */
@@ -2220,6 +2334,10 @@ document.addEventListener('click', e => {
   if (a.tagName === 'LABEL' || a.tagName === 'SELECT') return;
   switch (act) {
     case 'view': setView(a.dataset.v); break;
+    case 'undo': undoLast(); break;
+    case 'allMode': UI.allMode = a.dataset.m; try { localStorage.setItem('orbit.allMode', UI.allMode); } catch (er) {} renderTasks(); break;
+    case 'addFromBar': addFromBar(); break;
+    case 'addRow': { const inp = a.parentElement.querySelector('input'); if (inp) { inp.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })); inp.focus(); } break; }
     case 'openSide': $('#side').classList.add('open'); $('#sideScrim').classList.add('on'); break;
     case 'closeSide': closeSide(); break;
     case 'focus': {
@@ -2279,7 +2397,8 @@ document.addEventListener('click', e => {
       break;
     }
     case 'seed': seedExample(); render(); break;
-    case 'achieve': { const g = G(UI.focus); updateGoal(g, { done: !g.done }); render(); if (g.done) toast('"' + g.title + '" achieved'); break; }
+    case 'achieve': { const g = G(UI.focus); setAchieved(g.id, !g.done); break; }
+    case 'delGoalGo': closeDlg(); deleteGoal(id, true); break;
     case 'color': updateGoal(G(UI.focus), { color: a.dataset.c }); render(); break;
     case 'delGoal': deleteGoal(UI.focus); break;
     case 'openTask': UI.openTask = id; UI.pickDate = false; render(); break;
@@ -2458,7 +2577,7 @@ function ctxDo(action) {
     if (action === 'open' || action === 'rename') { UI.view = 'goals'; setFocusRaw(id); showPanel(true); render(); if (action === 'rename') focusRename('.ptitle'); }
     else if (action === 'inside') { UI.view = 'goals'; setFocus(id); render(); }
     else if (action === 'add') openAdd(id);
-    else if (action === 'achieve' || action === 'unachieve') { updateGoal(g, { done: action === 'achieve' }); render(); if (g.done) toast('"' + g.title + '" achieved'); }
+    else if (action === 'achieve' || action === 'unachieve') setAchieved(id, action === 'achieve');
     else if (action === 'delete') deleteGoal(id);
     return;
   }
@@ -2500,7 +2619,7 @@ window.addEventListener('resize', () => { if (UI.ctx) closeCtx(); });
 
 /* ---------- settings page ---------- */
 function renderSettings() {
-  $('#setHead').innerHTML = '<button class="iconbtn menu-btn" data-act="openSide" aria-label="Open menu">' + icon('menu') + '</button><div class="tt"><div class="h1">Settings</div></div>';
+  $('#setHead').innerHTML = '<button class="iconbtn menu-btn" data-act="openSide" aria-label="Open menu">' + icon('menu') + '</button><div class="tt"><div class="h1">Settings</div></div><div class="tools">' + undoBtnHTML() + '</div>';
   const email = Store.live && Store.user ? Store.user.email : '';
   let h = '<div class="set-card"><h3>Account</h3>' +
     (email ? '<p class="small muted">Signed in as <b style="color:var(--text)">' + esc(email) + '</b>. Everything saves to your account and syncs across devices.</p><div class="row"><button class="btn ghost" data-act="logout">' + icon('logout', 'sm') + 'Sign out</button></div>'
@@ -2598,6 +2717,7 @@ document.addEventListener('change', e => {
 });
 document.addEventListener('keydown', e => {
   const el = e.target;
+  if ((e.ctrlKey || e.metaKey) && !e.shiftKey && (e.key === 'z' || e.key === 'Z') && !el.matches('input,textarea,select')) { e.preventDefault(); undoLast(); return; }
   if (e.key === 'Enter' && !e.shiftKey) {
     if (el.id === 'authEmail' || el.id === 'authPass') { e.preventDefault(); authSubmit($('#authPrimary').dataset.act); return; }
     if (el.id === 'addInput') { e.preventDefault(); addFromBar(); return; }
@@ -2667,15 +2787,30 @@ $('#stage').addEventListener('pointerdown', e => {
 });
 window.addEventListener('pointermove', e => {
   if (!drag) return;
-  const dx = e.clientX - drag.sx, dy = e.clientY - drag.sy;
-  if (!drag.moved) { if (Math.hypot(dx, dy) < 8) return; drag.moved = true; drag.base = drag.el.style.transform; drag.el.classList.add('dragging'); $('#stage').classList.add('is-dragging'); }
-  drag.el.style.transform = drag.base + ' translate(' + dx + 'px,' + dy + 'px)';
-  $$('.node.drop-ok').forEach(x => x.classList.remove('drop-ok'));
-  const t = dropTargetAt(e.clientX, e.clientY, drag);
-  if (t && (drag.kind === 'task' || t.id === null || canMoveGoal(drag.id, t.id))) t.el.classList.add('drop-ok');
+  drag.cx = e.clientX; drag.cy = e.clientY;
+  if (!drag.moved) {
+    if (Math.hypot(e.clientX - drag.sx, e.clientY - drag.sy) < 8) return;
+    drag.moved = true; drag.base = drag.el.style.transform; drag.el.classList.add('dragging'); $('#stage').classList.add('is-dragging');
+    if (!$('#dragHint')) { const hint = document.createElement('div'); hint.id = 'dragHint'; document.body.appendChild(hint); }
+  }
+  if (drag.raf) return;
+  drag.raf = requestAnimationFrame(() => {
+    const d = drag; if (!d) return; d.raf = 0;
+    d.el.style.transform = d.base + ' translate(' + (d.cx - d.sx) + 'px,' + (d.cy - d.sy) + 'px)';
+    $$('.node.drop-ok').forEach(x => x.classList.remove('drop-ok'));
+    const t = dropTargetAt(d.cx, d.cy, d), here = UI.focus || null, hint = $('#dragHint');
+    let msg = 'Drop to park it here';
+    if (t && t.id !== here) {
+      const ok = d.kind === 'task' || t.id === null || canMoveGoal(d.id, t.id);
+      if (ok) { t.el.classList.add('drop-ok'); msg = 'Move into “' + (t.id ? G(t.id).title : rootName()) + '”'; } else msg = 'Cannot go there';
+    }
+    if (hint) { hint.textContent = msg; hint.style.left = (d.cx + 16) + 'px'; hint.style.top = (d.cy + 18) + 'px'; hint.classList.add('on'); }
+  });
 });
 window.addEventListener('pointerup', e => {
   if (!drag) return; const d = drag; drag = null;
+  const hint = $('#dragHint'); if (hint) hint.classList.remove('on');
+  if (d.raf) cancelAnimationFrame(d.raf);
   if (!d.moved) return;
   justDragged = true; setTimeout(() => { justDragged = false; }, 80);
   d.el.classList.remove('dragging'); $('#stage').classList.remove('is-dragging');
@@ -2695,7 +2830,7 @@ window.addEventListener('pointerup', e => {
   }
   render();
 });
-window.addEventListener('pointercancel', () => { if (drag && drag.moved) { drag.el.classList.remove('dragging'); $('#stage').classList.remove('is-dragging'); render(); } drag = null; });
+window.addEventListener('pointercancel', () => { const hint = $('#dragHint'); if (hint) hint.classList.remove('on'); if (drag && drag.moved) { drag.el.classList.remove('dragging'); $('#stage').classList.remove('is-dragging'); render(); } drag = null; });
 
 /* =====================================================================
    EXAMPLE DATA
