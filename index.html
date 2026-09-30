@@ -1,57 +1,1993 @@
-// Supabase Edge Function: suggest
-// Gives Orbit AI goal and task ideas. Needs one secret: ANTHROPIC_API_KEY
-import { createClient } from 'jsr:@supabase/supabase-js@2';
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#07090d">
+<title>Orbit</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="config.js"></script>
+<style>
+/* ============ TOKENS (shared with Life OS: dark blue/teal) ============ */
+:root{
+  --bg:#07090d; --bg-2:#0b0f15; --surface:#0f141c; --surface-2:#151c26; --surface-3:#1c2531;
+  --line:#1d2632; --line-2:#2b3646;
+  --text:#e7edf4; --text-2:#a9b5c3; --muted:#6c7989;
+  --blue:#3b82f6; --blue-2:#6aa2ff; --teal:#1fc8b4;
+  --ok:#2fbf71; --warn:#f5b642; --danger:#f0605d;
+  --grad:linear-gradient(90deg,#3b82f6,#1fc8b4);
+  --font:'Inter',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+  --mono:'JetBrains Mono',ui-monospace,Menlo,Consolas,monospace;
+  --r-sm:8px; --r-md:11px; --r-lg:16px;
+  --ease:cubic-bezier(.2,.8,.2,1); --spring:cubic-bezier(.34,1.35,.5,1);
+  --t-orbit:.62s;
+  --side-w:260px; --panel-w:352px;
+  color-scheme:dark;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{background:var(--bg);color:var(--text);font:14px/1.45 var(--font);-webkit-font-smoothing:antialiased;overflow:hidden;
+  background-image:radial-gradient(rgba(255,255,255,.035) 1px,transparent 1px);background-size:22px 22px}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer;text-align:inherit}
+input,textarea,select{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--blue-2);outline-offset:2px}
+[hidden]{display:none!important}
+.ic{width:18px;height:18px;flex:none}
+.ic.sm{width:15px;height:15px}
+.mono{font-family:var(--mono)}
 
-const cors = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+/* ============ SHELL ============ */
+.app{display:grid;grid-template-columns:var(--side-w) 1fr;height:100dvh}
+.side{background:rgba(11,15,21,.88);border-right:1px solid var(--line);display:flex;flex-direction:column;gap:14px;
+  padding:22px 12px calc(14px + env(safe-area-inset-bottom));min-height:0;backdrop-filter:blur(14px);z-index:45}
+.brand{font-weight:800;font-size:22px;letter-spacing:.16em;background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent;padding:0 10px}
+.search{display:flex;align-items:center;gap:8px;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:0 10px;height:36px;color:var(--muted)}
+.search:focus-within{border-color:var(--blue)}
+.search input{flex:1;min-width:0;background:none;border:0;outline:0;color:var(--text)}
+.nav{display:flex;flex-direction:column;gap:2px;overflow:auto;flex:1;min-height:0}
+.nav-item{display:flex;align-items:center;gap:11px;padding:8px 10px;border-radius:9px;color:var(--text-2);width:100%}
+.nav-item:hover{background:var(--surface)}
+.nav-item.on{background:var(--surface-2);color:var(--text)}
+.nav-item .count{margin-left:auto;font:500 11px var(--mono);color:var(--muted)}
+.nav-item .name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.nav-sep{height:1px;background:var(--line);margin:8px 10px}
+.c-goals{color:var(--teal)} .c-day{color:var(--warn)} .c-imp{color:#f2668b} .c-plan{color:var(--blue-2)} .c-link{color:var(--teal)} .c-all{color:var(--text-2)} .c-list{color:var(--muted)}
+.newlist{display:flex;align-items:center;gap:11px;padding:8px 10px;color:var(--muted)}
+.newlist input{flex:1;min-width:0;background:none;border:0;outline:0;color:var(--text)}
+.side-foot{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:0 4px}
+.pill{display:inline-flex;align-items:center;gap:7px;height:30px;padding:0 12px;border:1px solid var(--line-2);border-radius:999px;font-size:12px;font-weight:600;color:var(--text-2);background:var(--surface)}
+.pill .dot{width:7px;height:7px;border-radius:50%;background:var(--muted)}
+.pill.ok .dot{background:var(--ok);box-shadow:0 0 8px var(--ok)} .pill.saving .dot{background:var(--warn)} .pill.error .dot{background:var(--danger)}
+.iconbtn{width:34px;height:34px;border-radius:9px;display:grid;place-items:center;color:var(--text-2);flex:none}
+.iconbtn:hover{background:var(--surface-2);color:var(--text)}
+.btn{height:36px;padding:0 14px;border-radius:9px;background:var(--blue);color:#fff;font-weight:600;display:inline-flex;align-items:center;justify-content:center;gap:7px;white-space:nowrap}
+.btn:hover{background:#4a8df8}
+.btn.ghost{background:var(--surface-2);color:var(--text);border:1px solid var(--line-2)}
+.btn.ghost:hover{background:var(--surface-3)}
+.btn.good{background:rgba(47,191,113,.14);color:var(--ok);border:1px solid rgba(47,191,113,.35)}
+.btn.danger{background:transparent;color:var(--danger);border:1px solid rgba(240,96,93,.3)}
+.btn.danger:hover{background:rgba(240,96,93,.08)}
+.main{position:relative;min-width:0;min-height:0;overflow:hidden}
+.view{position:absolute;inset:0;display:none;min-height:0}
+.view.on{display:grid}
+.h1{font-weight:800;font-size:34px;letter-spacing:.1em;text-transform:uppercase;line-height:1;background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+.menu-btn{display:none}
+
+/* ============ GOALS VIEW ============ */
+#goalsView{grid-template-columns:1fr var(--panel-w)}
+.stage-wrap{display:grid;grid-template-rows:auto 1fr;min-width:0;min-height:0}
+.ghead{display:flex;align-items:center;gap:12px;padding:24px 28px 0;flex-wrap:wrap}
+.crumbs{display:flex;flex-wrap:wrap;align-items:center;gap:2px;font-size:13px;color:var(--muted);flex:1 1 100%;min-height:24px}
+.crumbs button{padding:3px 6px;border-radius:6px;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.crumbs button:hover{color:var(--text);background:var(--surface)}
+.crumbs .cur{color:var(--text);font-weight:600}
+.stage{position:relative;overflow:hidden;min-height:0;outline:none}
+.stage::before{content:"";position:absolute;left:50%;top:50%;width:70vmin;height:70vmin;transform:translate(-50%,-50%);border-radius:50%;
+  background:radial-gradient(closest-side,rgba(59,130,246,.10),transparent);pointer-events:none}
+#links{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible}
+.orbit-ring{fill:none;stroke:rgba(255,255,255,.05);stroke-width:1;stroke-dasharray:2 6}
+.link{stroke:color-mix(in srgb,var(--h) 40%,transparent);stroke-width:1.5;fill:none;transition:stroke .2s,stroke-width .2s}
+.link.draw{stroke-dasharray:1;stroke-dashoffset:1;animation:draw .55s var(--ease) forwards}
+.link.task{stroke-width:1;stroke:color-mix(in srgb,var(--h) 25%,transparent)}
+.link.add{stroke:rgba(255,255,255,.08);stroke-dasharray:3 5}
+.link.hot{stroke:color-mix(in srgb,var(--h) 90%,transparent);stroke-width:2.2}
+.link.parent{stroke:rgba(255,255,255,.12);stroke-dasharray:3 5}
+@keyframes draw{to{stroke-dashoffset:0}}
+.legend{position:absolute;left:24px;bottom:18px;display:flex;flex-wrap:wrap;gap:14px;font-size:11.5px;color:var(--muted);pointer-events:none}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.sw{width:11px;height:11px;border-radius:50%;display:inline-block}
+.sw.s1{background:var(--blue);box-shadow:0 0 8px var(--blue)} .sw.s2{background:rgba(59,130,246,.25);border:1.5px solid rgba(59,130,246,.8)}
+.sw.s3{border:1.5px solid var(--blue)} .sw.s4{width:7px;height:7px;background:var(--surface-3);border:1px solid var(--line-2)}
+.hint{position:absolute;right:22px;bottom:18px;font-size:11.5px;color:var(--muted);text-align:right;pointer-events:none;max-width:260px}
+.empty-cta{position:absolute;left:50%;bottom:12%;transform:translateX(-50%);text-align:center;display:flex;flex-direction:column;align-items:center;gap:10px;color:var(--text-2)}
+.empty-cta .row{display:flex;gap:8px}
+
+/* bubbles */
+.node{position:absolute;left:0;top:0;border-radius:50%;z-index:2;
+  transition:transform var(--t-orbit) var(--ease),width var(--t-orbit) var(--spring),height var(--t-orbit) var(--spring),opacity .45s ease;
+  will-change:transform}
+.node.center{z-index:3}
+.node.leaving{pointer-events:none;z-index:1}
+.float{position:absolute;inset:0;border-radius:50%;animation:bob 6.5s ease-in-out infinite alternate;animation-delay:var(--d,0s)}
+.node.center .float,.node.parent .float{animation:none}
+.body{position:absolute;inset:0;border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;text-align:center;
+  padding:15%;overflow:hidden;transition:transform .25s var(--ease),box-shadow .25s,background .3s,border-color .3s}
+.node:hover .body{transform:scale(1.07)}
+.node.center:hover .body{transform:scale(1.02)}
+.node:active .body{transform:scale(.97)}
+.ttl{font-weight:600;line-height:1.16;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;font-size:12.5px;transition:font-size var(--t-orbit) var(--ease);word-break:break-word}
+.center .ttl{font-size:17px;font-weight:700;-webkit-line-clamp:3}
+.lbl{font-size:10.5px;font-weight:600;color:rgba(255,255,255,.7);letter-spacing:.02em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.pct{font:700 11px var(--mono);opacity:.8}
+.center .pct{font-size:13px}
+.ext{position:absolute;top:calc(100% + 6px);left:0;white-space:nowrap;font-size:11.5px;color:var(--muted);pointer-events:none}
+.ring{position:absolute;inset:-6px;width:calc(100% + 12px);height:calc(100% + 12px);transform:rotate(-90deg);pointer-events:none;overflow:visible}
+.ring circle{fill:none;stroke-width:3;vector-effect:non-scaling-stroke}
+.ring .trk{stroke:rgba(255,255,255,.07)}
+.ring .val{stroke:var(--h);stroke-linecap:round;filter:drop-shadow(0 0 4px var(--h))}
+.sats{position:absolute;inset:-12px;border-radius:50%;animation:spin 48s linear infinite;pointer-events:none}
+.sats i{position:absolute;width:5px;height:5px;margin:-2.5px 0 0 -2.5px;border-radius:50%;background:color-mix(in srgb,var(--h) 80%,white 20%);opacity:.8}
+.badge{position:absolute;right:6%;top:6%;width:22%;height:22%;min-width:16px;min-height:16px;border-radius:50%;background:var(--ok);display:grid;place-items:center;color:#06140c;box-shadow:0 0 0 3px var(--bg)}
+.badge svg{width:65%;height:65%}
+@keyframes bob{from{transform:translateY(-3px)}to{transform:translateY(3px)}}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* tier treatments: hue = life area, fill = specificity */
+.root .body{background:radial-gradient(circle at 32% 26%,#1f3252,#0e1624 72%);border:1px solid #2c4166;box-shadow:0 0 60px -12px rgba(59,130,246,.45)}
+.t1 .body{background:radial-gradient(circle at 30% 24%,color-mix(in srgb,var(--h) 70%,white 30%),var(--h) 52%,color-mix(in srgb,var(--h) 62%,black 38%));
+  box-shadow:0 12px 44px -12px var(--h),inset 0 -8px 20px rgba(0,0,0,.18);color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.35)}
+.t2 .body{background:color-mix(in srgb,var(--h) 20%,var(--surface));border:1.5px solid color-mix(in srgb,var(--h) 72%,transparent);box-shadow:0 10px 36px -16px var(--h)}
+.t3 .body{background:var(--surface-2);border:1.5px solid var(--h)}
+.task .body{background:var(--surface);border:1px solid var(--line-2);padding:14%}
+.task .ttl{font-size:10.5px;font-weight:500;-webkit-line-clamp:3}
+.task .tchk{width:15px;height:15px;border-radius:50%;border:1.5px solid color-mix(in srgb,var(--h) 70%,white 10%);display:grid;place-items:center;flex:none}
+.task.done .body{background:color-mix(in srgb,var(--h) 16%,var(--surface));border-color:color-mix(in srgb,var(--h) 45%,transparent)}
+.task.done .tchk{background:var(--h);border-color:var(--h);color:#fff}
+.task.done .ttl{text-decoration:line-through;opacity:.55}
+.task .tchk svg{width:10px;height:10px}
+.add .body,.addtask .body{border:1.5px dashed var(--line-2);color:var(--muted);background:rgba(15,20,28,.6)}
+.add:hover .body,.addtask:hover .body{border-color:var(--blue-2);color:var(--text)}
+.add .body,.addtask .body{padding:6%}
+.add .ttl,.addtask .ttl{font-size:10.5px;font-weight:600;word-break:normal;white-space:nowrap}
+.more .body{background:var(--surface);border:1px solid var(--line-2);color:var(--text-2)}
+.center.t1 .body,.center.t2 .body,.center.t3 .body{box-shadow:0 0 0 8px color-mix(in srgb,var(--h) 10%,transparent),0 20px 70px -18px var(--h)}
+.center.t3 .body{background:color-mix(in srgb,var(--h) 10%,var(--surface-2))}
+.parent .body{background:var(--surface-2);border:1px solid var(--line-2);color:var(--text-2)}
+.parent .body svg{width:45%;height:45%}
+.achieved .body{filter:saturate(.75)}
+.node.burst .body{animation:burst .55s var(--ease)}
+@keyframes burst{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--h) 70%,transparent)}40%{transform:scale(1.22)}100%{transform:scale(1);box-shadow:0 0 0 22px transparent}}
+
+.composer{position:absolute;z-index:6;transform:translate(-50%,-50%);display:flex;gap:6px;align-items:center;background:var(--surface-2);border:1px solid var(--blue);border-radius:12px;padding:6px;
+  box-shadow:0 22px 60px -12px rgba(0,0,0,.7);animation:pop .22s var(--spring)}
+.composer input{width:230px;max-width:52vw;height:34px;background:var(--bg-2);border:1px solid var(--line-2);border-radius:8px;padding:0 10px;outline:0}
+@keyframes pop{from{transform:translate(-50%,-50%) scale(.85);opacity:0}}
+
+/* goal panel */
+.gpanel{border-left:1px solid var(--line);background:rgba(11,15,21,.86);overflow:auto;backdrop-filter:blur(14px);min-height:0;z-index:4}
+.pp{padding:24px 20px 60px;display:flex;flex-direction:column;gap:16px}
+.peek{display:none}
+.ptier{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted);flex-wrap:wrap}
+.ptier b{color:var(--text-2);font-weight:600}
+.ptier button{color:var(--text-2);text-decoration:underline;text-decoration-color:var(--line-2);text-underline-offset:3px}
+.hdot{width:9px;height:9px;border-radius:50%;background:var(--h);box-shadow:0 0 8px var(--h);flex:none}
+.ptitle{width:100%;background:none;border:0;outline:0;resize:none;font-size:22px;font-weight:700;line-height:1.25;overflow:hidden;padding:2px 0;border-radius:6px}
+.ptitle:focus{box-shadow:0 0 0 1px var(--line-2);background:var(--surface)}
+.pbar{height:6px;border-radius:99px;background:var(--surface-3);overflow:hidden}
+.pbar i{display:block;height:100%;border-radius:99px;background:var(--h,var(--blue));box-shadow:0 0 10px var(--h,var(--blue));transition:width .5s var(--ease)}
+.pstat{font:500 11.5px var(--mono);color:var(--muted);display:flex;justify-content:space-between;flex-wrap:wrap;gap:2px 12px;margin-top:7px}
+.pstat span:last-child{text-align:right}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px}
+.frow{display:flex;align-items:center;gap:12px;padding:11px 14px;border-top:1px solid var(--line);color:var(--text-2);min-height:46px}
+.frow:first-child{border-top:0}
+.frow .grow{flex:1;min-width:0}
+.frow textarea,.frow input[type=text]{width:100%;background:none;border:0;outline:0;resize:none;color:var(--text)}
+.frow input[type=date]{background:var(--surface-2);border:1px solid var(--line-2);border-radius:8px;height:32px;padding:0 8px;color:var(--text)}
+.sel{background:var(--surface-2);border:1px solid var(--line-2);border-radius:8px;height:32px;padding:0 8px;color:var(--text);max-width:100%;min-width:0}
+.swatches{display:flex;gap:8px}
+.swatch{width:22px;height:22px;border-radius:50%;background:var(--h);box-shadow:0 0 0 2px var(--surface)}
+.swatch.on{box-shadow:0 0 0 2px var(--surface),0 0 0 4px var(--h)}
+.sec-h{display:flex;align-items:center;gap:8px;font-size:12.5px;font-weight:600;color:var(--text-2);margin:4px 0 8px}
+.sec-h .n{font:500 11px var(--mono);color:var(--muted)}
+.grow-row{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:10px;width:100%;color:var(--text)}
+.grow-row:hover{background:var(--surface-2)}
+.grow-row .t{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.grow-row .mini{width:44px;height:4px;border-radius:9px;background:var(--surface-3);overflow:hidden;flex:none}
+.grow-row .mini i{display:block;height:100%;background:var(--h)}
+.grow-row .pc{font:500 11px var(--mono);color:var(--muted);width:34px;text-align:right}
+.addrow{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:10px;color:var(--muted);border:1px dashed var(--line-2);margin-top:6px}
+.addrow:focus-within{border-color:var(--blue);border-style:solid}
+.addrow input{flex:1;min-width:0;background:none;border:0;outline:0;color:var(--text)}
+.muted{color:var(--muted)}
+.small{font-size:12px}
+
+/* ============ TASKS VIEW ============ */
+#tasksView{grid-template-rows:auto 1fr}
+.thead{padding:24px 32px 6px;display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap}
+.thead .tt{flex:1;min-width:220px}
+.thead .h1 input{all:unset;width:100%}
+.tsub{color:var(--muted);font-size:13px;margin-top:8px}
+.tools{display:flex;gap:6px;align-items:center}
+.tbody{overflow:auto;padding:6px 32px 140px;min-height:0}
+.tcol{max-width:860px}
+.addbar{background:var(--surface);border:1px solid var(--line);border-radius:12px;margin:10px 0 16px;overflow:hidden}
+.addbar:focus-within{border-color:var(--blue)}
+.addbar .top{display:flex;align-items:center;gap:12px;padding:0 10px 0 14px;height:50px;color:var(--blue-2)}
+.addbar .top input{flex:1;min-width:0;background:none;border:0;outline:0;color:var(--text);font-size:14.5px}
+.addbar .opts{display:none;align-items:center;gap:6px;padding:6px 10px 8px;border-top:1px solid var(--line);flex-wrap:wrap}
+.addbar:focus-within .opts,.addbar.has .opts{display:flex}
+.chip{display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 10px;border-radius:8px;border:1px solid var(--line-2);color:var(--text-2);font-size:12px;background:var(--surface-2);position:relative}
+.chip.on{color:var(--text);border-color:var(--blue)}
+.chip input[type=date]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%}
+.chip select{all:unset;cursor:pointer;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.trow{display:flex;align-items:center;gap:12px;background:var(--surface);border:1px solid var(--line);border-radius:11px;padding:10px 12px;margin-bottom:6px;cursor:pointer;
+  transition:background .15s,opacity .35s,transform .35s var(--ease)}
+.trow:hover{background:var(--surface-2)}
+.trow.open{border-color:var(--blue)}
+.chk{width:22px;height:22px;border-radius:50%;border:1.8px solid #45526a;display:grid;place-items:center;flex:none;color:transparent;transition:all .2s}
+.chk svg{width:13px;height:13px}
+.chk:hover{border-color:var(--blue-2);color:var(--blue-2)}
+.trow.done .chk,.chk.on{background:var(--blue);border-color:var(--blue);color:#fff}
+.trow.done .ttitle{text-decoration:line-through;color:var(--muted)}
+.trow.leaving{opacity:0;transform:translateX(18px)}
+.tmain{flex:1;min-width:0}
+.ttitle{overflow:hidden;text-overflow:ellipsis;word-break:break-word}
+.tmeta{display:flex;flex-wrap:wrap;gap:3px 12px;font-size:12px;color:var(--muted);margin-top:2px}
+.meta{display:inline-flex;align-items:center;gap:4px}
+.meta .ic{width:13px;height:13px}
+.meta.over{color:var(--danger)} .meta.today{color:var(--blue-2)}
+.gchip{display:inline-flex;align-items:center;gap:6px;max-width:220px}
+.gchip .hdot{width:7px;height:7px}
+.gchip span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.star{color:var(--muted);flex:none}
+.star:hover{color:var(--text)}
+.star.on{color:var(--warn)}
+.star.on svg{fill:currentColor}
+.sec-toggle{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:600;color:var(--text-2);margin:18px 0 8px;padding:4px 8px 4px 4px;border-radius:7px}
+.sec-toggle:hover{background:var(--surface)}
+.sec-toggle .ic{transition:transform .2s}
+.sec-toggle.closed .ic{transform:rotate(-90deg)}
+.group-h{font-size:12.5px;font-weight:600;color:var(--text-2);margin:18px 0 8px 4px}
+.group-h.over{color:var(--danger)}
+.suggest{border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-bottom:10px;background:rgba(245,182,66,.04)}
+.suggest .srow{display:flex;align-items:center;gap:10px;padding:6px 0;font-size:13px}
+.suggest .srow .t{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.empty{padding:60px 20px;text-align:center;color:var(--muted)}
+.empty .big{font-size:16px;color:var(--text-2);font-weight:600;margin-bottom:6px}
+
+/* ============ DRAWER ============ */
+.scrim{position:fixed;inset:0;background:rgba(3,5,8,.55);opacity:0;pointer-events:none;transition:opacity .25s;z-index:50}
+.scrim.on{opacity:1;pointer-events:auto}
+.drawer{position:fixed;top:0;right:0;bottom:0;width:min(420px,100%);background:var(--bg-2);border-left:1px solid var(--line);transform:translateX(102%);
+  transition:transform .34s var(--ease);z-index:51;display:flex;flex-direction:column;padding-bottom:env(safe-area-inset-bottom)}
+.drawer.on{transform:none}
+.dhead{display:flex;align-items:center;gap:8px;padding:12px 12px 4px;color:var(--muted);font-size:12px}
+.dhead .where{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dbody{overflow:auto;padding:8px 16px 20px;display:flex;flex-direction:column;gap:12px;flex:1}
+.dtitle{display:flex;align-items:flex-start;gap:12px;padding:14px}
+.dtitle textarea{flex:1;background:none;border:0;outline:0;resize:none;font-size:18px;font-weight:650;line-height:1.3;overflow:hidden}
+.dtitle .chk{margin-top:3px}
+.step{display:flex;align-items:center;gap:10px;padding:8px 14px;border-top:1px solid var(--line)}
+.step .chk{width:18px;height:18px}
+.step .chk svg{width:11px;height:11px}
+.step input{flex:1;min-width:0;background:none;border:0;outline:0;color:var(--text)}
+.step.done input{text-decoration:line-through;color:var(--muted)}
+.step .x{opacity:0;color:var(--muted)}
+.step:hover .x,.step .x:focus{opacity:1}
+.qchips{display:flex;gap:6px;flex-wrap:wrap;padding:0 14px 12px 44px}
+.qchips button{height:26px;padding:0 10px;border-radius:7px;background:var(--surface-2);border:1px solid var(--line-2);font-size:12px;color:var(--text-2)}
+.qchips button:hover{color:var(--text)}
+.frow.on{color:var(--blue-2)}
+.dfoot{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-top:1px solid var(--line);color:var(--muted);font-size:12px}
+
+/* ============ ADD SHEET ============ */
+.as-scrim{position:fixed;inset:0;background:rgba(3,5,8,.55);z-index:55;opacity:0;pointer-events:none;transition:opacity .2s}
+.as-scrim.on{opacity:1;pointer-events:auto}
+.addsheet{position:fixed;left:50%;top:50%;transform:translate(-50%,-47%) scale(.97);opacity:0;pointer-events:none;width:min(580px,94vw);max-height:84vh;display:flex;flex-direction:column;
+  background:var(--bg-2);border:1px solid var(--line-2);border-radius:18px;z-index:56;box-shadow:0 30px 80px -20px rgba(0,0,0,.8);transition:transform .25s var(--ease),opacity .2s}
+.addsheet.on{opacity:1;pointer-events:auto;transform:translate(-50%,-50%)}
+.as-head{display:flex;align-items:flex-start;gap:10px;padding:16px 14px 10px 18px}
+.as-head .where{flex:1;min-width:0}
+.as-path{display:flex;align-items:center;gap:8px;font-weight:600;margin-top:2px}
+.as-path span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.seg{display:inline-flex;align-self:flex-start;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:3px;margin:0 18px}
+.seg button{height:30px;padding:0 16px;border-radius:7px;font-size:13px;font-weight:600;color:var(--text-2)}
+.seg button.on{background:var(--surface-3);color:var(--text)}
+.seg button:disabled{opacity:.35;cursor:not-allowed}
+.as-input{display:flex;gap:8px;padding:12px 18px}
+.as-input input{flex:1;min-width:0;height:40px;background:var(--surface);border:1px solid var(--line-2);border-radius:10px;padding:0 12px;outline:0}
+.as-input input:focus{border-color:var(--blue)}
+.as-body{overflow:auto;padding:0 18px 18px;display:flex;flex-direction:column;gap:6px;min-height:0}
+.cats{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;scrollbar-width:thin;flex:none}
+.cats button{white-space:nowrap;height:30px;padding:0 12px;border-radius:999px;border:1px solid var(--line-2);font-size:12.5px;color:var(--text-2);background:var(--surface)}
+.cats button.on{border-color:var(--blue);color:var(--text);background:rgba(59,130,246,.14)}
+.as-label{font-size:11.5px;font-weight:600;color:var(--muted);margin:8px 2px 0}
+.sug{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:10px;background:var(--surface);border:1px solid var(--line)}
+.sug .t{flex:1;min-width:0}
+.sug .t small{display:block;color:var(--muted);font-size:11.5px;margin-top:1px}
+.sug .ty{width:11px;height:11px;border-radius:50%;flex:none;border:1.5px solid var(--h);background:color-mix(in srgb,var(--h) 25%,transparent)}
+.sug .ty.task{width:8px;height:8px;border-color:var(--line-2);background:var(--surface-3)}
+.sug .mini{height:28px;padding:0 10px;border-radius:7px;font-size:12px;font-weight:600;background:var(--surface-2);border:1px solid var(--line-2);color:var(--text);white-space:nowrap;flex:none}
+.sug .mini.pri{background:var(--blue);border-color:var(--blue);color:#fff}
+.btn.ai{align-self:flex-start;border-color:rgba(31,200,180,.4)}
+.btn.ai .ic{color:var(--teal)}
+.nomeasure{font-size:12.5px;color:var(--muted);background:var(--surface);border:1px dashed var(--line-2);border-radius:10px;padding:10px 12px}
+.frow.metric{gap:8px;justify-content:center}
+.frow.metric input{width:74px;height:32px;background:var(--surface-2);border:1px solid var(--line-2);border-radius:8px;padding:0 8px;text-align:center;color:var(--text)}
+.frow.metric input.unit{width:84px;text-align:left}
+.frow.metric .iconbtn{font-size:18px;font-weight:600;background:var(--surface-2);border:1px solid var(--line-2)}
+.pct{white-space:nowrap;max-width:100%;overflow:hidden;text-overflow:ellipsis}
+.pct.dim{opacity:.55;font-family:var(--font);font-weight:500}
+.node.loose .float{animation:drift 9s ease-in-out infinite alternate;animation-delay:var(--d,0s)}
+@keyframes drift{0%{transform:translate(-5px,-6px)}50%{transform:translate(6px,2px)}100%{transform:translate(-2px,7px)}}
+.grow-row .pc{width:auto;min-width:34px}
+
+/* ============ TOAST / AUTH / MOBILE NAV ============ */
+.toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom));transform:translate(-50%,20px);opacity:0;pointer-events:none;
+  background:var(--surface-3);border:1px solid var(--line-2);border-radius:12px;padding:10px 12px 10px 16px;display:flex;align-items:center;gap:14px;z-index:70;
+  transition:all .25s var(--ease);box-shadow:0 20px 50px -10px rgba(0,0,0,.6);font-size:13px}
+.toast.on{opacity:1;transform:translate(-50%,0);pointer-events:auto}
+.toast button{color:var(--blue-2);font-weight:600}
+.auth{position:fixed;inset:0;display:none;place-items:center;z-index:80;background:var(--bg);background-image:radial-gradient(rgba(255,255,255,.035) 1px,transparent 1px);background-size:22px 22px}
+.auth.on{display:grid}
+.auth .box{width:min(360px,92vw);display:flex;flex-direction:column;gap:12px}
+.auth .brand{font-size:40px;padding:0;margin-bottom:6px}
+.auth input{height:44px;background:var(--surface);border:1px solid var(--line-2);border-radius:10px;padding:0 14px;outline:0}
+.auth input:focus{border-color:var(--blue)}
+.auth .err{color:var(--danger);font-size:12.5px;min-height:18px}
+.auth .err.info{color:var(--text-2)}
+.passwrap{position:relative;display:flex}
+.passwrap input{flex:1;padding-right:64px}
+.showpass{position:absolute;right:8px;top:50%;transform:translateY(-50%);font-size:12px;font-weight:600;color:var(--text-2);padding:6px 8px;border-radius:6px}
+.showpass:hover{color:var(--text);background:var(--surface-2)}
+.linkbtn{align-self:center;font-size:12.5px;color:var(--muted);padding:6px}
+.linkbtn:hover{color:var(--text)}
+.bnav{display:none}
+.side-scrim{display:none}
+
+@media (max-width:1180px){:root{--panel-w:308px}}
+@media (max-width:860px){
+  .app{grid-template-columns:1fr}
+  .side{position:fixed;left:0;top:0;bottom:0;width:min(300px,86vw);transform:translateX(-102%);transition:transform .3s var(--ease);padding-top:calc(20px + env(safe-area-inset-top))}
+  .side.open{transform:none}
+  .side-scrim{display:block;position:fixed;inset:0;background:rgba(3,5,8,.55);z-index:44;opacity:0;pointer-events:none;transition:opacity .25s}
+  .side-scrim.on{opacity:1;pointer-events:auto}
+  .menu-btn{display:grid}
+  .h1{font-size:26px}
+  .ghead{padding:calc(14px + env(safe-area-inset-top)) 16px 0}
+  #goalsView{grid-template-columns:1fr}
+  .stage-wrap{padding-bottom:150px}
+  .legend,.hint{display:none}
+  .gpanel{position:absolute;left:0;right:0;bottom:0;max-height:78%;border-left:0;border-top:1px solid var(--line-2);border-radius:20px 20px 0 0;
+    transform:translateY(calc(100% - 146px - env(safe-area-inset-bottom)));transition:transform .35s var(--ease);background:rgba(11,15,21,.97)}
+  .gpanel.open{transform:none}
+  .gpanel:not(.open) .pp{visibility:hidden;opacity:0}
+  .pp{transition:opacity .25s}
+  .peek{display:flex;align-items:center;gap:10px;padding:10px 18px 12px;position:sticky;top:0;background:rgba(11,15,21,.97);z-index:2;width:100%;border-radius:20px 20px 0 0}
+  .peek::before{content:"";position:absolute;left:50%;top:6px;width:36px;height:4px;border-radius:9px;background:var(--line-2);transform:translateX(-50%)}
+  .peek .t{flex:1;min-width:0;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:6px}
+  .peek .p{font:700 12px var(--mono);color:var(--text-2);margin-top:6px}
+  .peek .ic{margin-top:6px;transition:transform .3s}
+  .gpanel.open .peek .ic{transform:rotate(180deg)}
+  .pp{padding:4px 18px 120px}
+  .thead{padding:calc(14px + env(safe-area-inset-top)) 16px 4px}
+  .tbody{padding:6px 16px 140px}
+  .bnav{display:flex;position:fixed;left:50%;bottom:calc(12px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:30;gap:2px;padding:6px;
+    background:rgba(15,20,28,.92);border:1px solid var(--line-2);border-radius:18px;backdrop-filter:blur(14px);box-shadow:0 16px 40px -10px rgba(0,0,0,.7)}
+  .bnav button{display:flex;flex-direction:column;align-items:center;gap:3px;width:62px;padding:7px 0 6px;border-radius:12px;font-size:10.5px;color:var(--muted)}
+  .bnav button.on{background:linear-gradient(135deg,#2f7df6,#1fb6c8);color:#fff}
+  .toast{bottom:calc(92px + env(safe-area-inset-bottom))}
+  .step .x{opacity:1}
+  .addsheet{left:0;right:0;top:auto;bottom:0;width:100%;max-height:88vh;transform:translateY(100%);border-radius:18px 18px 0 0;padding-bottom:env(safe-area-inset-bottom)}
+  .addsheet.on{transform:none}
+  .center .ttl{font-size:13.5px;-webkit-line-clamp:2}
+  .center .lbl{font-size:9.5px}
+  .task .body{padding:12%;gap:2px}
+  .task .ttl{font-size:9.5px;-webkit-line-clamp:2}
+  .task .tchk{width:12px;height:12px}
+}
+@media (prefers-reduced-motion:reduce){
+  :root{--t-orbit:.01s}
+  .float,.sats,.node.loose .float{animation:none}
+  .link.draw{animation:none;stroke-dashoffset:0}
+  .node.burst .body{animation:none}
+  *{transition-duration:.01s!important}
+}
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <aside class="side" id="side">
+    <div class="brand">ORBIT</div>
+    <label class="search"><svg class="ic sm" data-i="search"></svg><input id="search" type="search" placeholder="Search tasks" autocomplete="off"></label>
+    <nav class="nav" id="nav"></nav>
+    <div class="side-foot"><span class="pill" id="sync"><span class="dot"></span><span id="syncText">Local only</span></span>
+      <span style="display:flex;gap:2px">
+        <button class="iconbtn" data-act="exportData" title="Download a backup of all your data"><svg class="ic" data-i="download"></svg></button>
+        <button class="iconbtn" data-act="importData" title="Restore from a backup file"><svg class="ic" data-i="upload"></svg></button>
+        <button class="iconbtn" id="logoutBtn" data-act="logout" title="Sign out" hidden><svg class="ic" data-i="logout"></svg></button>
+      </span>
+      <input type="file" id="importFile" accept=".json,application/json" hidden></div>
+  </aside>
+  <div class="side-scrim" id="sideScrim" data-act="closeSide"></div>
+
+  <main class="main">
+    <section class="view" id="goalsView">
+      <div class="stage-wrap">
+        <div class="ghead">
+          <button class="iconbtn menu-btn" data-act="openSide" aria-label="Open menu"><svg class="ic" data-i="menu"></svg></button>
+          <div class="h1">Goals</div>
+          <div class="crumbs" id="crumbs"></div>
+        </div>
+        <div class="stage" id="stage" tabindex="-1" aria-label="Goal map">
+          <svg id="links"></svg>
+          <div id="nodes"></div>
+          <div class="legend"><span><i class="sw s1"></i>Goal</span><span><i class="sw s2"></i>Sub-goal</span><span><i class="sw s3"></i>Deeper</span><span><i class="sw s4"></i>Task</span></div>
+          <div class="hint">Tap a goal to go deeper. Tap a task bubble to check it off, right-click it for details. Esc goes back up.</div>
+        </div>
+      </div>
+      <aside class="gpanel" id="gpanel"></aside>
+    </section>
+
+    <section class="view" id="tasksView">
+      <header class="thead" id="thead"></header>
+      <div class="tbody"><div class="tcol" id="tlist"></div></div>
+    </section>
+  </main>
+</div>
+
+<nav class="bnav" id="bnav"></nav>
+<div class="scrim" id="scrim" data-act="closeDrawer"></div>
+<aside class="drawer" id="drawer" aria-label="Task details"></aside>
+<div class="as-scrim" id="addScrim" data-act="closeAdd"></div>
+<div class="addsheet" id="addSheet" role="dialog" aria-label="Add a goal or task"></div>
+<div class="toast" id="toast"><span id="toastMsg"></span><button id="toastUndo">Undo</button></div>
+
+<div class="auth" id="auth">
+  <div class="box">
+    <div class="brand">ORBIT</div>
+    <div class="muted" style="margin-bottom:8px">Goals that break down into tasks you can actually do.</div>
+    <input id="authEmail" type="email" placeholder="Email" autocomplete="email">
+    <div class="passwrap"><input id="authPass" type="password" placeholder="Password" autocomplete="current-password"><button class="showpass" data-act="showPass" type="button">Show</button></div>
+    <div class="err" id="authErr"></div>
+    <button class="btn" data-act="signIn" id="authPrimary">Sign in</button>
+    <button class="btn ghost" data-act="signUp" id="authSecondary">Create account</button>
+    <button class="linkbtn" data-act="forgot" id="authForgot">Forgot password?</button>
+  </div>
+</div>
+
+<script>
+/* =====================================================================
+   CONFIG lives in config.js (next to this file) so app updates never
+   wipe your keys. Without it the app runs locally on this browser.
+   ===================================================================== */
+var CFG = window.ORBIT_CONFIG || {};
+var SUPABASE_URL = CFG.url || 'YOUR_SUPABASE_URL';
+var SUPABASE_ANON_KEY = CFG.anonKey || 'YOUR_SUPABASE_ANON_KEY';
+var AI_ENABLED = !!CFG.ai;
+
+/* ---------------- utils ---------------- */
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const uid = () => (crypto.randomUUID ? crypto.randomUUID() : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => { const r = Math.random() * 16 | 0; return (c === 'x' ? r : (r & 3 | 8)).toString(16); }));
+const pad = n => String(n).padStart(2, '0');
+const ymd = d => d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+const today = () => ymd(new Date());
+const parseD = s => { const p = s.split('-').map(Number); return new Date(p[0], p[1] - 1, p[2]); };
+const addDays = (s, n) => { const d = parseD(s); d.setDate(d.getDate() + n); return ymd(d); };
+const dayDiff = s => Math.round((parseD(s) - parseD(today())) / 864e5);
+const nowIso = () => new Date().toISOString();
+const fmtShort = s => parseD(s).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+const fmtLong = s => parseD(s).toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
+const hash = s => { let h = 0; for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0; return Math.abs(h); };
+
+/* ---------------- icons ---------------- */
+const IC = {
+  search: '<circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/>',
+  sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M6.3 17.7l-1.4 1.4M19.1 4.9l-1.4 1.4"/>',
+  star: '<path d="M12 2.5l2.9 6 6.6.9-4.8 4.6 1.2 6.5L12 17.4l-5.9 3.1 1.2-6.5L2.5 9.4l6.6-.9z"/>',
+  cal: '<rect x="3" y="4.5" width="18" height="17" rx="2.5"/><path d="M16 2.5v4M8 2.5v4M3 10h18"/>',
+  list: '<path d="M8 6h13M8 12h13M8 18h13M3.5 6h.01M3.5 12h.01M3.5 18h.01"/>',
+  home: '<path d="M3 10l9-7 9 7v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
+  target: '<circle cx="12" cy="12" r="9.5"/><circle cx="12" cy="12" r="5.5"/><circle cx="12" cy="12" r="1.5"/>',
+  layers: '<path d="M12 2.5L2.5 7.5 12 12.5l9.5-5z"/><path d="M2.5 12.5L12 17.5l9.5-5M2.5 17L12 22l9.5-5"/>',
+  link: '<path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/>',
+  check: '<path d="M20 6.5L9 17.5l-5-5"/>',
+  plus: '<path d="M12 5v14M5 12h14"/>',
+  trash: '<path d="M3 6h18M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6M10 11v6M14 11v6M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>',
+  x: '<path d="M18 6L6 18M6 6l12 12"/>',
+  repeat: '<path d="M17 2l4 4-4 4"/><path d="M3 11V9a3 3 0 0 1 3-3h15M7 22l-4-4 4-4"/><path d="M21 13v2a3 3 0 0 1-3 3H3"/>',
+  note: '<path d="M14 2.5H6a2 2 0 0 0-2 2v15a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8.5z"/><path d="M14 2.5v6h6M8 13h8M8 17h5"/>',
+  menu: '<path d="M3 6h18M3 12h18M3 18h18"/>',
+  right: '<path d="M9 18l6-6-6-6"/>',
+  down: '<path d="M6 9l6 6 6-6"/>',
+  up: '<path d="M18 15l-6-6-6 6"/>',
+  back: '<path d="M15 18l-6-6 6-6"/>',
+  logout: '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/>',
+  pencil: '<path d="M17 3a2.8 2.8 0 0 1 4 4L7.5 20.5 2 22l1.5-5.5z"/>',
+  sort: '<path d="M3 6h13M3 12h9M3 18h5M17 10v10M14 17l3 3 3-3"/>',
+  download: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/>',
+  upload: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/>',
+  sparkle: '<path d="M12 3l1.8 4.9L19 9.7l-5.2 1.8L12 16.5l-1.8-5L5 9.7l5.2-1.8z"/><path d="M19 15l.7 1.8 1.8.7-1.8.7L19 20l-.7-1.8-1.8-.7 1.8-.7z"/>',
+  steps: '<path d="M9 6h11M9 12h11M9 18h11"/><path d="M4 6l1 1 2-2M4 12l1 1 2-2M4 18l1 1 2-2"/>'
 };
-const json = (body: unknown, status = 200) =>
-  new Response(JSON.stringify(body), { status, headers: { ...cors, 'Content-Type': 'application/json' } });
+const icon = (n, cls) => '<svg class="ic ' + (cls || '') + '" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + IC[n] + '</svg>';
+function hydrateIcons(root) { $$('svg[data-i]', root).forEach(s => { s.outerHTML = icon(s.dataset.i, s.getAttribute('class').replace('ic', '').trim()); }); }
 
-Deno.serve(async (req) => {
-  if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
+/* ---------------- design tokens used by JS ---------------- */
+const HUES = { blue: '#3b82f6', teal: '#1fc8b4', coral: '#ff7a59', amber: '#f5b642', violet: '#9b8cff', rose: '#f2668b' };
+const HUE_KEYS = Object.keys(HUES);
+const MAX_DEPTH = 6;
+const levelName = d => d <= 1 ? 'Goal' : 'Sub-goal';
+const levelLong = d => d <= 1 ? 'Goal' : 'Sub-goal \u00b7 level ' + d;
+const REPEATS = { '': 'Does not repeat', daily: 'Daily', weekdays: 'Weekdays', weekly: 'Weekly', monthly: 'Monthly', yearly: 'Yearly' };
 
-  // Only signed-in Orbit users can spend AI credit
-  const sb = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_ANON_KEY')!, {
-    global: { headers: { Authorization: req.headers.get('Authorization') ?? '' } },
-  });
-  const { data: { user } } = await sb.auth.getUser();
-  if (!user) return json({ error: 'Sign in required' }, 401);
+/* ---------------- state ---------------- */
+let S = { goals: [], lists: [], tasks: [] };
+const UI = { view: 'goals', focus: null, prevFocusKey: null, q: '', openTask: null, sorts: {}, showDone: {}, composer: null, burst: null, renaming: false, draft: { due: null, important: false, goal: '' } };
 
-  const { path = [], idea = '', want = 'goal', existing = [], levelsLeft = 3 } = await req.json().catch(() => ({}));
-  const clip = (x: unknown) => String(x).slice(0, 120);
-  let ask: string;
-  if (want === 'plan') {
-    ask = `The person wants to: "${clip(idea)}". Return exactly one item of type "goal" whose title is a clear, motivating version of that goal. Give it 3 to 5 sub-goals (type "goal"), each with 2 to 4 tasks (type "task") as children.`;
-  } else if (want === 'task') {
-    ask = `Goal path: ${path.map(clip).join(' > ')}. Suggest 6 to 8 tasks (type "task") that directly move the last goal forward. No children.`;
-  } else {
-    ask = `Goal path: ${path.map(clip).join(' > ')}. Suggest 5 to 7 sub-goals (type "goal") for the last goal in the path.` +
-      (levelsLeft > 1 ? ' Give each one 2 to 4 tasks (type "task") as children.' : ' No children.');
+/* ---------------- storage (dual mode) ---------------- */
+const LS_KEY = 'orbit.v1';
+const COLS = {
+  goals: ['id', 'parent_id', 'tier', 'title', 'note', 'color', 'target_date', 'done', 'metric_current', 'metric_target', 'metric_unit', 'template_key', 'sort', 'created_at'],
+  lists: ['id', 'name', 'sort', 'created_at'],
+  tasks: ['id', 'list_id', 'goal_id', 'title', 'note', 'done', 'done_at', 'important', 'due', 'my_day', 'repeat', 'steps', 'sort', 'created_at']
+};
+function clean(table, row) {
+  const o = {};
+  COLS[table].forEach(k => { let v = row[k]; if (v === '' && /date|due|my_day|_at|repeat|parent_id|goal_id|list_id/.test(k)) v = null; o[k] = v === undefined ? null : v; });
+  return o;
+}
+const Store = {
+  live: false, sb: null, user: null, q: Promise.resolve(), timers: {}, pending: 0,
+  loadLocal() { try { const raw = localStorage.getItem(LS_KEY); if (raw) { const d = JSON.parse(raw); S.goals = d.goals || []; S.lists = d.lists || []; S.tasks = d.tasks || []; return true; } } catch (e) {} return false; },
+  persistLocal() { try { localStorage.setItem(LS_KEY, JSON.stringify(S)); } catch (e) {} },
+  save(table, row, delay) {
+    if (!this.live) { this.persistLocal(); return; }
+    const k = table + row.id; clearTimeout(this.timers[k]);
+    const go = () => { delete this.timers[k]; this.enqueue(() => this.sb.from(table).upsert(clean(table, row))); };
+    if (delay) { this.timers[k] = setTimeout(go, delay); setSync('saving'); } else go();
+  },
+  del(table, id) {
+    if (!this.live) { this.persistLocal(); return; }
+    clearTimeout(this.timers[table + id]);
+    this.enqueue(() => this.sb.from(table).delete().eq('id', id));
+  },
+  enqueue(fn) {
+    this.pending++; setSync('saving');
+    this.q = this.q.then(fn).then(res => { if (res && res.error) throw res.error; })
+      .then(() => { if (--this.pending <= 0) { this.pending = 0; setSync('ok'); } })
+      .catch(err => { this.pending = Math.max(0, this.pending - 1); setSync('error', err.message || String(err)); console.error(err); });
+  },
+  async loadRemote() {
+    const res = await Promise.all(['goals', 'lists', 'tasks'].map(n => this.sb.from(n).select('*')));
+    res.forEach(r => { if (r.error) throw r.error; });
+    S.goals = res[0].data; S.lists = res[1].data; S.tasks = res[2].data.map(t => Object.assign(t, { steps: t.steps || [] }));
   }
-  const prompt = `You help people break life goals into practical plans.
-${ask}
-Rules: sub-goals are outcomes, specific and measurable where it makes sense. Tasks are single concrete actions someone could finish in a day or less, starting with a verb. Titles under 60 characters, plain language, no numbering, no emoji. Do not repeat these existing items: ${JSON.stringify((existing as unknown[]).slice(0, 40).map(clip))}.
-Respond with only JSON and nothing else, in this shape:
-{"items":[{"title":"...","type":"goal","children":[{"title":"...","type":"task"}]}]}`;
+};
+function setSync(state, msg) {
+  const el = $('#sync'); el.className = 'pill ' + (state === 'local' ? '' : state);
+  $('#syncText').textContent = { local: 'Local only', ok: 'Synced', saving: 'Saving', error: 'Sync error' }[state];
+  el.title = msg || (state === 'local' ? 'Data is stored in this browser' : '');
+}
 
-  const r = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'x-api-key': Deno.env.get('ANTHROPIC_API_KEY')!,
-      'anthropic-version': '2023-06-01',
-      'content-type': 'application/json',
-    },
-    body: JSON.stringify({ model: 'claude-haiku-4-5-20251001', max_tokens: 1500, messages: [{ role: 'user', content: prompt }] }),
+/* ---------------- model helpers ---------------- */
+const G = id => S.goals.find(g => g.id === id);
+const T = id => S.tasks.find(t => t.id === id);
+const L = id => S.lists.find(l => l.id === id);
+const bySort = (a, b) => ((a.sort || 0) - (b.sort || 0)) || String(a.created_at).localeCompare(String(b.created_at));
+const kidsOf = id => S.goals.filter(g => (g.parent_id || null) === (id || null)).sort(bySort);
+const tasksOf = id => S.tasks.filter(t => t.goal_id === id);
+function descIds(id) { const out = [id]; kidsOf(id).forEach(k => out.push.apply(out, descIds(k.id))); return out; }
+function visionOf(g) { let n = 0; while (g && g.parent_id && n++ < 5) { const p = G(g.parent_id); if (!p) break; g = p; } return g; }
+function hueOf(g) { const v = g && visionOf(g); return HUES[(v && v.color) || 'blue'] || HUES.blue; }
+function pathOf(id) { const out = []; let g = G(id), n = 0; while (g && n++ < 5) { out.unshift(g); g = g.parent_id ? G(g.parent_id) : null; } return out; }
+let _pc = null;
+function invalidate() { _pc = null; }
+/* Progress model
+   - Achieved goal = 100%.
+   - Number goal (metric_target set) = current / target.
+   - Otherwise the average of direct children: sub-goals count by their own
+     percent (an empty sub-goal counts 0), tasks count 1 when done, steps give
+     partial credit up to 90%. Repeating tasks are habits and are left out.
+   - A goal with nothing measurable shows no percent at all. */
+function taskCredit(t) {
+  if (t.done) return 1;
+  const st = t.steps || [];
+  return st.length ? Math.min(0.9, st.filter(x => x.done).length / st.length) : 0;
+}
+function measure(id) {
+  if (!_pc) _pc = new Map();
+  const key = id || 'root'; if (_pc.has(key)) return _pc.get(key);
+  const g = id ? G(id) : null; let m;
+  if (g && g.done) m = { p: 1, how: 'achieved' };
+  else if (g && +g.metric_target > 0) m = { p: clamp((+g.metric_current || 0) / +g.metric_target, 0, 1), how: 'metric' };
+  else {
+    const kids = kidsOf(id), all = id ? tasksOf(id) : [], ts = all.filter(t => !t.repeat);
+    const parts = kids.map(k => measure(k.id).p || 0).concat(ts.map(taskCredit));
+    m = parts.length ? { p: parts.reduce((a, b) => a + b, 0) / parts.length, how: 'rollup', goals: kids.length, tasks: ts.length, repeats: all.length - ts.length }
+                     : { p: null, how: 'none', repeats: all.length };
+  }
+  _pc.set(key, m); return m;
+}
+const prog = id => measure(id).p || 0;
+const measured = id => measure(id).p !== null;
+const pct = id => Math.round(prog(id) * 100);
+const fmtNum = n => (+n || 0).toLocaleString(undefined, { maximumFractionDigits: 2 });
+function metricText(g) {
+  const u = (g.metric_unit || '').trim();
+  if (u === '$') return '$' + fmtNum(g.metric_current) + ' / $' + fmtNum(g.metric_target);
+  return fmtNum(g.metric_current) + ' / ' + fmtNum(g.metric_target) + (u ? ' ' + u : '');
+}
+function branchTasks(id) { const ids = new Set(id ? descIds(id) : S.goals.map(g => g.id)); return S.tasks.filter(t => t.goal_id && ids.has(t.goal_id)); }
+
+/* ---------------- mutations ---------------- */
+function nextColor() { const used = kidsOf(null).map(v => v.color); return HUE_KEYS.find(k => used.indexOf(k) < 0) || HUE_KEYS[used.length % HUE_KEYS.length]; }
+function addGoal(parentId, title, extra) {
+  const p = parentId ? G(parentId) : null; const tier = p ? p.tier + 1 : 1; if (tier > MAX_DEPTH) return null;
+  const sibs = kidsOf(parentId);
+  const g = Object.assign({ id: uid(), parent_id: parentId || null, tier: tier, title: title, note: '', color: tier === 1 ? nextColor() : null, target_date: null, done: false,
+    metric_current: null, metric_target: null, metric_unit: null, template_key: null,
+    sort: (sibs.length ? Math.max.apply(null, sibs.map(x => x.sort || 0)) : 0) + 1, created_at: nowIso() }, extra || {});
+  S.goals.push(g); Store.save('goals', g); return g;
+}
+/* Adds a library node or AI item, optionally with its whole plan below it. */
+function addTree(parentId, node) {
+  const c = { goals: 0, tasks: 0 };
+  (function walk(pid, n) {
+    if (n.type === 'task') { addTask({ goal_id: pid, title: n.title }); c.tasks++; return; }
+    const g = addGoal(pid, n.title, { template_key: n.key || null, metric_target: n.metric ? n.metric.target : null, metric_unit: n.metric ? n.metric.unit : null, metric_current: n.metric ? 0 : null });
+    if (!g) return; c.goals++;
+    (n.children || []).forEach(ch => walk(g.id, ch));
+  })(parentId, node);
+  return c;
+}
+function updateGoal(g, patch, delay) { Object.assign(g, patch); Store.save('goals', g, delay); }
+function deleteGoal(id) {
+  const g = G(id); if (!g) return;
+  const ids = descIds(id);
+  const snapshot = { goals: S.goals.filter(x => ids.indexOf(x.id) >= 0).map(x => Object.assign({}, x)), taskLinks: S.tasks.filter(t => ids.indexOf(t.goal_id) >= 0).map(t => [t.id, t.goal_id]) };
+  if (ids.indexOf(UI.focus) >= 0) setFocusRaw(g.parent_id || null);
+  S.goals = S.goals.filter(x => ids.indexOf(x.id) < 0);
+  S.tasks.forEach(t => { if (ids.indexOf(t.goal_id) >= 0) t.goal_id = null; });
+  Store.del('goals', id);
+  render();
+  toast('Deleted "' + g.title + '"', () => {
+    snapshot.goals.sort((a, b) => a.tier - b.tier).forEach(x => { S.goals.push(x); Store.save('goals', x); });
+    snapshot.taskLinks.forEach(p => { const t = T(p[0]); if (t) { t.goal_id = p[1]; Store.save('tasks', t); } });
+    render();
   });
-  if (!r.ok) return json({ error: `AI request failed (${r.status})` }, 502);
-  const data = await r.json();
-  const text = (data.content ?? []).map((c: { text?: string }) => c.text ?? '').join('');
+}
+function addTask(fields) {
+  const t = Object.assign({ id: uid(), list_id: null, goal_id: null, title: '', note: '', done: false, done_at: null, important: false, due: null, my_day: null, repeat: null, steps: [], sort: Date.now(), created_at: nowIso() }, fields);
+  S.tasks.push(t); Store.save('tasks', t); return t;
+}
+function updateTask(t, patch, delay) { Object.assign(t, patch); Store.save('tasks', t, delay); }
+function nextDue(d, rep) {
+  const dt = parseD(d);
+  if (rep === 'daily') dt.setDate(dt.getDate() + 1);
+  else if (rep === 'weekdays') { do { dt.setDate(dt.getDate() + 1); } while (dt.getDay() === 0 || dt.getDay() === 6); }
+  else if (rep === 'weekly') dt.setDate(dt.getDate() + 7);
+  else if (rep === 'monthly') dt.setMonth(dt.getMonth() + 1);
+  else if (rep === 'yearly') dt.setFullYear(dt.getFullYear() + 1);
+  return ymd(dt);
+}
+function toggleTask(id, opts) {
+  const t = T(id); if (!t) return;
+  const was = t.done; let spawned = null;
+  updateTask(t, { done: !was, done_at: !was ? nowIso() : null });
+  if (!was && t.repeat) {
+    spawned = addTask({ list_id: t.list_id, goal_id: t.goal_id, title: t.title, note: t.note, important: t.important, repeat: t.repeat,
+      due: nextDue(t.due || today(), t.repeat), steps: (t.steps || []).map(s => ({ id: uid(), t: s.t, done: false })) });
+  }
+  if (!was) toast(spawned ? 'Done. Next one is due ' + fmtShort(spawned.due) : 'Completed', () => {
+    updateTask(t, { done: false, done_at: null });
+    if (spawned) { S.tasks = S.tasks.filter(x => x.id !== spawned.id); Store.del('tasks', spawned.id); }
+    render();
+  });
+  if (opts && opts.defer) setTimeout(render, opts.defer); else render();
+}
+function deleteTask(id) {
+  const t = T(id); if (!t) return; const copy = Object.assign({}, t);
+  S.tasks = S.tasks.filter(x => x.id !== id); Store.del('tasks', id);
+  if (UI.openTask === id) UI.openTask = null;
+  render();
+  toast('Deleted "' + (copy.title || 'task') + '"', () => { S.tasks.push(copy); Store.save('tasks', copy); render(); });
+}
+
+/* ---------------- toast ---------------- */
+let toastTimer, toastUndo;
+function toast(msg, undo) {
+  $('#toastMsg').textContent = msg; toastUndo = undo; $('#toastUndo').style.display = undo ? '' : 'none';
+  $('#toast').classList.add('on'); clearTimeout(toastTimer); toastTimer = setTimeout(() => $('#toast').classList.remove('on'), 4200);
+}
+$('#toastUndo').onclick = () => { $('#toast').classList.remove('on'); if (toastUndo) { const u = toastUndo; toastUndo = null; u(); } };
+
+/* =====================================================================
+   RENDER
+   ===================================================================== */
+function render() {
+  invalidate();
+  renderSide(); renderBnav();
+  $('#goalsView').classList.toggle('on', UI.view === 'goals');
+  $('#tasksView').classList.toggle('on', UI.view !== 'goals');
+  if (UI.view === 'goals') { renderCrumbs(); renderStage(); renderPanel(); } else renderTasks();
+  renderDrawer();
+}
+function renderLight() { invalidate(); renderSide(); if (UI.view === 'goals') { renderCrumbs(); renderStage(); } else renderTasks(); }
+
+/* ---------------- sidebar ---------------- */
+const SMART = [
+  { v: 'myday', name: 'My Day', ic: 'sun', c: 'c-day', f: t => t.my_day === today() },
+  { v: 'important', name: 'Important', ic: 'star', c: 'c-imp', f: t => t.important },
+  { v: 'planned', name: 'Planned', ic: 'cal', c: 'c-plan', f: t => !!t.due },
+  { v: 'linked', name: 'From goals', ic: 'link', c: 'c-link', f: t => !!t.goal_id },
+  { v: 'all', name: 'All', ic: 'layers', c: 'c-all', f: () => true },
+  { v: 'inbox', name: 'Tasks', ic: 'home', c: 'c-plan', f: t => !t.list_id }
+];
+function viewFilter(v) { const s = SMART.find(x => x.v === v); if (s) return s.f; const id = v.slice(5); return t => t.list_id === id; }
+function openCount(v) { const f = viewFilter(v); return S.tasks.filter(t => !t.done && f(t)).length; }
+function renderSide() {
+  let h = '<button class="nav-item ' + (UI.view === 'goals' ? 'on' : '') + '" data-act="view" data-v="goals">' + icon('target', 'c-goals') + '<span class="name">Goals</span><span class="count">' + kidsOf(null).length + '</span></button><div class="nav-sep"></div>';
+  SMART.forEach(s => {
+    const n = openCount(s.v);
+    h += '<button class="nav-item ' + (UI.view === s.v && !UI.q ? 'on' : '') + '" data-act="view" data-v="' + s.v + '">' + icon(s.ic, s.c) + '<span class="name">' + s.name + '</span><span class="count">' + (n || '') + '</span></button>';
+  });
+  if (S.lists.length) h += '<div class="nav-sep"></div>';
+  S.lists.slice().sort(bySort).forEach(l => {
+    const v = 'list:' + l.id, n = openCount(v);
+    h += '<button class="nav-item ' + (UI.view === v && !UI.q ? 'on' : '') + '" data-act="view" data-v="' + v + '">' + icon('list', 'c-list') + '<span class="name">' + esc(l.name) + '</span><span class="count">' + (n || '') + '</span></button>';
+  });
+  h += '<label class="newlist">' + icon('plus') + '<input id="newList" placeholder="New list" autocomplete="off"></label>';
+  const nav = $('#nav'), had = document.activeElement && document.activeElement.id === 'newList', val = had ? document.activeElement.value : '';
+  nav.innerHTML = h;
+  if (had) { const i = $('#newList'); i.value = val; i.focus(); }
+}
+function renderBnav() {
+  const items = [['goals', 'target', 'Goals'], ['myday', 'sun', 'My Day'], ['important', 'star', 'Important'], ['planned', 'cal', 'Planned'], ['menu', 'menu', 'Lists']];
+  $('#bnav').innerHTML = items.map(i => '<button class="' + (UI.view === i[0] ? 'on' : '') + '" data-act="' + (i[0] === 'menu' ? 'openSide' : 'view') + '" data-v="' + i[0] + '">' + icon(i[1]) + i[2] + '</button>').join('');
+}
+
+/* ---------------- goals: crumbs ---------------- */
+function renderCrumbs() {
+  let h = '<button data-act="focus" data-id="" class="' + (UI.focus ? '' : 'cur') + '">Your life</button>';
+  if (UI.focus) pathOf(UI.focus).forEach((g, i, a) => { h += icon('right', 'sm') + '<button data-act="focus" data-id="' + g.id + '" class="' + (i === a.length - 1 ? 'cur' : '') + '">' + esc(g.title) + '</button>'; });
+  $('#crumbs').innerHTML = h;
+}
+
+/* ---------------- goals: bubble stage ---------------- */
+const nodeEls = new Map();
+let lastLayout = null;
+const GOAL_SIZE = [0, 0.125, 0.105, 0.092, 0.082, 0.074, 0.068];
+function computeLayout() {
+  const stage = $('#stage');
+  const W = stage.clientWidth, H = stage.clientHeight, small = W < 640;
+  const cx = W / 2, cy = H / 2, m = Math.min(W, H);
+  const f = UI.focus, fg = f ? G(f) : null, depth = fg ? fg.tier : 0;
+  const items = [], rings = [];
+  const R0 = clamp(m * (0.15 - Math.min(depth, 5) * 0.007), 46, 96);
+  const focusHue = fg ? hueOf(fg) : HUES.blue;
+  items.push({ key: f || 'root', id: f, kind: f ? 'goal' : 'root', role: 'center', x: cx, y: cy, r: R0 });
+  if (fg) { const pr = small ? 20 : 26; items.push({ key: fg.parent_id || 'root', id: fg.parent_id, kind: fg.parent_id ? 'goal' : 'root', role: 'parent', x: pr + 16, y: pr + 14, r: pr }); }
+  const goals = kidsOf(f).map(g => ({ key: g.id, id: g.id, kind: 'goal', role: 'orbit' }));
+  const ts = fg ? tasksOf(f).sort((a, b) => (a.done - b.done) || ((a.sort || 0) - (b.sort || 0)))
+                : S.tasks.filter(t => !t.goal_id && !t.done).sort((a, b) => (b.sort || 0) - (a.sort || 0));
+  const cap = small ? 8 : 12, tl = [];
+  ts.slice(0, cap).forEach(t => tl.push({ key: 't:' + t.id, id: t.id, kind: 'task', role: 'orbit', loose: !fg }));
+  if (ts.length > cap) tl.push({ key: 'more:' + (f || 'root'), kind: 'more', role: 'orbit', n: ts.length - cap });
+  const add = { key: 'add:' + (f || 'root'), kind: 'add', role: 'orbit' };
+  const M = small ? 8 : 18, maxRx = W / 2 - M, maxRy = H / 2 - M;
+  const goalR = clamp(m * GOAL_SIZE[Math.min(depth + 1, 6)], small ? 34 : 38, 76);
+  const taskR = clamp(m * 0.052, small ? 30 : 24, 34);
+  const roomForTwo = R0 + 2 * goalR + 2 * taskR + 30 <= Math.min(maxRx, maxRy);
+  const two = goals.length > 0 && tl.length > 0 && roomForTwo;
+  const r1 = two ? goals.concat([add]) : goals.concat(tl, [add]), r2 = two ? tl : [];
+  const baseR = k => (k.kind === 'task' || k.kind === 'more') ? taskR : k.kind === 'add' ? Math.max(taskR, goalR * 0.72) : goalR;
+  const fit = (rx, ry) => { rx = Math.min(rx, ry * 1.6); ry = Math.min(ry, rx * 1.6); return [rx, ry]; };
+  function ring(list, rx, ry, rMax, offset) {
+    const n = list.length; if (!n) return;
+    const per = 2 * Math.PI * Math.sqrt((rx * rx + ry * ry) / 2);
+    list.forEach((it, i) => {
+      const r = Math.min(baseR(it), per / n * 0.42, rMax);
+      const a = -Math.PI / 2 + offset + i * 2 * Math.PI / n;
+      it.x = cx + rx * Math.cos(a); it.y = cy + ry * Math.sin(a); it.r = Math.max(r, 16); items.push(it);
+    });
+    rings.push({ rx: rx, ry: ry });
+  }
+  if (!two) {
+    const rc = Math.max.apply(null, r1.map(baseR));
+    const d = fit(maxRx - rc, maxRy - rc), minD = R0 + rc * 0.8 + 18;
+    ring(r1, Math.max(d[0], minD), Math.max(d[1], minD), Math.max(18, Math.min(d[0], d[1]) - R0 - 12), 0);
+  } else {
+    const rt = taskR, o = fit(maxRx - rt, maxRy - rt);
+    const ix = Math.max(R0 + goalR + 14, (R0 + o[0]) * 0.5), iy = Math.max(R0 + goalR + 14, (R0 + o[1]) * 0.5);
+    const rMax1 = Math.max(18, Math.min(Math.min(ix, iy) - R0 - 10, (Math.min(o[0], o[1]) - Math.min(ix, iy)) * 0.55));
+    ring(r1, ix, iy, rMax1, 0);
+    ring(r2, o[0], o[1], rt, Math.PI / r2.length);
+  }
+  items.forEach(it => {
+    if (it.kind === 'goal') it.hue = hueOf(G(it.id));
+    else if (it.kind === 'root') it.hue = HUES.blue;
+    else if (!fg && (it.kind === 'task' || it.kind === 'more')) it.hue = '#8b98a9';
+    else it.hue = focusHue;
+  });
+  return { W: W, H: H, cx: cx, cy: cy, items: items, rings: rings, center: items[0] };
+}
+function ringSVG(p) {
+  const v = Math.round(p * 100);
+  return '<svg class="ring" viewBox="0 0 100 100" aria-hidden="true"><circle class="trk" cx="50" cy="50" r="48"/>' + (v > 0 ? '<circle class="val" cx="50" cy="50" r="48" pathLength="100" stroke-dasharray="' + v + ' 100"/>' : '') + '</svg>';
+}
+function satsHTML(id) {
+  const n = Math.min(kidsOf(id).length + tasksOf(id).length, 8); if (!n) return '';
+  let h = '<span class="sats">';
+  for (let i = 0; i < n; i++) { const a = -Math.PI / 2 + i * 2 * Math.PI / n; h += '<i style="left:' + (50 + 50 * Math.cos(a)).toFixed(2) + '%;top:' + (50 + 50 * Math.sin(a)).toFixed(2) + '%"></i>'; }
+  return h + '</span>';
+}
+function nodeInfo(it) {
+  const role = it.role;
+  let cls = it.kind, inner = '', ring = '', sats = '', ext = '', label = '', act = '';
+  if (it.kind === 'root') {
+    const n = kidsOf(null).length, ms = measured(null);
+    label = 'Your life' + (ms ? ', ' + pct(null) + '% overall' : '');
+    if (role === 'center') { ring = ringSVG(ms ? prog(null) : 0); inner = '<span class="lbl">' + n + ' goal' + (n === 1 ? '' : 's') + '</span><span class="ttl">Your life</span>' + (ms ? '<span class="pct">' + pct(null) + '%</span>' : ''); act = 'centerTap'; }
+    else { inner = icon('up'); ext = 'Your life'; act = 'focus'; label = 'Back to your life'; }
+  } else if (it.kind === 'goal') {
+    const g = G(it.id), mz = measure(g.id), ms = mz.p !== null;
+    cls += ' t' + Math.min(g.tier, 3) + (g.done ? ' achieved' : '');
+    const val = g.done ? 'Achieved' : mz.how === 'metric' ? metricText(g) : ms ? pct(g.id) + '%' : '';
+    label = levelName(g.tier) + ': ' + g.title + (val ? ', ' + val : ', nothing to measure yet');
+    if (role === 'parent') { inner = icon('up'); ext = g.title; act = 'focus'; label = 'Back to ' + g.title; }
+    else {
+      ring = ringSVG(ms ? mz.p : 0);
+      const badge = g.done ? '<span class="badge">' + icon('check') + '</span>' : '';
+      if (role === 'center') { inner = '<span class="lbl">' + levelLong(g.tier) + '</span><span class="ttl">' + esc(g.title) + '</span>' + (val ? '<span class="pct">' + esc(val) + '</span>' : '<span class="pct dim">Add steps</span>') + badge; act = 'centerTap'; }
+      else { inner = '<span class="ttl">' + esc(g.title) + '</span>' + (val ? '<span class="pct">' + esc(val) + '</span>' : '') + badge; sats = satsHTML(g.id); act = 'focus'; }
+    }
+  } else if (it.kind === 'task') {
+    const t = T(it.id); if (t.done) cls += ' done'; if (it.loose) cls += ' loose';
+    inner = '<span class="tchk">' + (t.done ? icon('check') : '') + '</span><span class="ttl">' + esc(t.title) + '</span>';
+    label = (t.done ? 'Completed task: ' : 'Task: ') + t.title + '. Activate to toggle.'; act = 'bubbleTask';
+  } else if (it.kind === 'add') {
+    inner = icon('plus', 'sm') + '<span class="ttl">Add</span>';
+    label = UI.focus ? 'Add a sub-goal or task' : 'Add a goal or task'; act = 'compose';
+  } else if (it.kind === 'more') { inner = '<span class="ttl mono">+' + it.n + '</span>'; label = it.n + ' more tasks'; act = UI.focus ? 'moreTasks' : 'moreRoot'; }
+  cls += ' ' + role;
+  const html = '<span class="float">' + ring + sats + '<span class="body">' + inner + '</span></span>' + (ext ? '<span class="ext">' + esc(ext) + '</span>' : '');
+  return { cls: cls, html: html, label: label, act: act };
+}
+function place(el, x, y, r) { el.style.width = el.style.height = (2 * r).toFixed(1) + 'px'; el.style.transform = 'translate(' + (x - r).toFixed(1) + 'px,' + (y - r).toFixed(1) + 'px)'; }
+function renderStage() {
+  const stage = $('#stage'); if (!stage.clientWidth) return;
+  const Lo = computeLayout();
+  const focusKey = UI.focus || 'root';
+  const focusChanged = !lastLayout || lastLayout.focusKey !== focusKey;
+  const prevKey = UI.prevFocusKey;
+  const exitItem = focusChanged && prevKey ? Lo.items.find(i => i.key === prevKey) : null;
+  const exit = exitItem || Lo.center;
+  const seen = new Set(); const box = $('#nodes');
+  let newIdx = 0;
+  Lo.items.forEach(it => {
+    seen.add(it.key);
+    let el = nodeEls.get(it.key); const fresh = !el;
+    const info = nodeInfo(it);
+    if (fresh) {
+      el = document.createElement('button'); el.type = 'button'; box.appendChild(el); nodeEls.set(it.key, el);
+      el.style.transition = 'none'; place(el, Lo.center.x, Lo.center.y, 6); el.style.opacity = '0';
+      el.getBoundingClientRect(); el.style.transition = '';
+      el.style.transitionDelay = (newIdx++ * 28) + 'ms';
+    } else el.style.transitionDelay = '0ms';
+    el.className = 'node ' + info.cls + (UI.burst === it.key ? ' burst' : '');
+    el.style.setProperty('--h', it.hue);
+    el.style.setProperty('--d', (-(hash(it.key) % 6000) / 1000) + 's');
+    el.dataset.act = info.act; el.dataset.id = it.id || ''; el.dataset.key = it.key;
+    el.setAttribute('aria-label', info.label);
+    if (el._html !== info.html) { el.innerHTML = info.html; el._html = info.html; }
+    place(el, it.x, it.y, it.r); el.style.opacity = '1';
+  });
+  nodeEls.forEach((el, key) => {
+    if (seen.has(key)) return;
+    nodeEls.delete(key); el.classList.add('leaving'); el.style.transitionDelay = '0ms';
+    place(el, exit.x, exit.y, 4); el.style.opacity = '0';
+    setTimeout(() => el.remove(), 650);
+  });
+  // links + orbit rings
+  let h = '';
+  Lo.rings.forEach(r => { h += '<ellipse class="orbit-ring" cx="' + Lo.cx + '" cy="' + Lo.cy + '" rx="' + r.rx.toFixed(1) + '" ry="' + r.ry.toFixed(1) + '"/>'; });
+  const c = Lo.center;
+  Lo.items.forEach((it, i) => {
+    if (it.role === 'center') return;
+    const dx = it.x - c.x, dy = it.y - c.y, d = Math.hypot(dx, dy) || 1;
+    const x1 = c.x + dx / d * (c.r + 8), y1 = c.y + dy / d * (c.r + 8), x2 = it.x - dx / d * (it.r + 6), y2 = it.y - dy / d * (it.r + 6);
+    if (d < c.r + it.r + 16) return;
+    const k = it.role === 'parent' ? 'parent' : (it.kind === 'task' || it.kind === 'more' ? 'task' : (it.kind === 'add' || it.kind === 'addtask' ? 'add' : 'goal'));
+    const draw = focusChanged && k !== 'parent' && k !== 'add';
+    h += '<line class="link ' + k + (draw ? ' draw' : '') + '" data-key="' + it.key + '" pathLength="1" x1="' + x1.toFixed(1) + '" y1="' + y1.toFixed(1) + '" x2="' + x2.toFixed(1) + '" y2="' + y2.toFixed(1) + '" style="--h:' + it.hue + (draw ? ';animation-delay:' + (0.22 + i * 0.025).toFixed(2) + 's' : '') + '"/>';
+  });
+  $('#links').innerHTML = h;
+  Lo.focusKey = focusKey; lastLayout = Lo;
+  UI.prevFocusKey = focusKey;
+  // empty state
+  let empty = $('#emptyCta');
+  if (!UI.focus && !kidsOf(null).length && !S.tasks.some(t => !t.goal_id && !t.done)) {
+    if (!empty) { empty = document.createElement('div'); empty.id = 'emptyCta'; empty.className = 'empty-cta'; stage.appendChild(empty); }
+    empty.innerHTML = '<div><b style="color:var(--text)">What do you want most?</b><br>Add a goal, then break it into sub-goals and tasks.</div><div class="row"><button class="btn" data-act="compose">' + icon('plus', 'sm') + 'Add a goal</button><button class="btn ghost" data-act="seed">Load an example</button></div>';
+  } else if (empty) empty.remove();
+  positionComposer();
+}
+function setFocusRaw(id) { UI.focus = id || null; UI.composer = null; removeComposer(); }
+function setFocus(id) {
+  if ((id || null) === UI.focus) return;
+  setFocusRaw(id);
+  $('#gpanel').classList.remove('open');
+  render();
+  setTimeout(() => { const el = nodeEls.get(UI.focus || 'root'); if (el && document.activeElement && document.activeElement.classList.contains('node')) el.focus({ preventScroll: true }); }, 30);
+}
+
+/* composer (rapid add from the orbit) */
+function removeComposer() { const el = $('#composer'); if (el) el.remove(); }
+function positionComposer() {
+  const el = $('#composer'); if (!el || !UI.composer || !lastLayout) return;
+  const key = (UI.composer.kind === 'task' ? 'addt:' : 'add:') + (UI.focus || 'root');
+  const it = lastLayout.items.find(i => i.key === key) || lastLayout.center;
+  const w = el.offsetWidth || 300, hgt = el.offsetHeight || 48;
+  el.style.left = clamp(it.x, w / 2 + 8, lastLayout.W - w / 2 - 8) + 'px';
+  el.style.top = clamp(it.y, hgt / 2 + 8, lastLayout.H - hgt / 2 - 8) + 'px';
+}
+function composerSubmit() {
+  const inp = $('#composerInput'); if (!inp) return; const v = inp.value.trim(); if (!v || !UI.composer) return;
+  if (UI.composer.kind === 'task') addTask({ goal_id: UI.focus, title: v });
+  else addGoal(UI.focus, v);
+  inp.value = ''; render(); inp.focus();
+}
+
+/* ---------------- goals: detail panel ---------------- */
+function taskRowHTML(t, opts) {
+  opts = opts || {};
+  const meta = [];
+  if (opts.showList !== false) { const ln = t.list_id ? (L(t.list_id) || {}).name : 'Tasks'; if (ln && opts.showList) meta.push('<span class="meta">' + esc(ln) + '</span>'); }
+  if (t.my_day === today() && opts.view !== 'myday') meta.push('<span class="meta">' + icon('sun') + 'My Day</span>');
+  if (t.due) { const dd = dayDiff(t.due); const cls = !t.done && dd < 0 ? 'over' : (dd === 0 ? 'today' : ''); const lab = dd === 0 ? 'Today' : dd === 1 ? 'Tomorrow' : dd === -1 ? 'Yesterday' : fmtShort(t.due); meta.push('<span class="meta ' + cls + '">' + icon('cal') + lab + '</span>'); }
+  if (t.repeat) meta.push('<span class="meta">' + icon('repeat') + '</span>');
+  if (t.steps && t.steps.length) meta.push('<span class="meta">' + t.steps.filter(s => s.done).length + ' of ' + t.steps.length + '</span>');
+  if (t.note) meta.push('<span class="meta">' + icon('note') + '</span>');
+  if (t.goal_id && opts.showGoal !== false) { const g = G(t.goal_id); if (g) meta.push('<span class="meta gchip"><i class="hdot" style="--h:' + hueOf(g) + '"></i><span>' + esc(g.title) + '</span></span>'); }
+  return '<div class="trow ' + (t.done ? 'done ' : '') + (UI.openTask === t.id ? 'open' : '') + '" data-act="openTask" data-id="' + t.id + '">' +
+    '<button class="chk" data-act="toggleTask" data-id="' + t.id + '" aria-label="' + (t.done ? 'Mark not complete' : 'Mark complete') + '">' + icon('check') + '</button>' +
+    '<div class="tmain"><div class="ttitle">' + esc(t.title) + '</div>' + (meta.length ? '<div class="tmeta">' + meta.join('') + '</div>' : '') + '</div>' +
+    '<button class="star ' + (t.important ? 'on' : '') + '" data-act="starTask" data-id="' + t.id + '" aria-label="' + (t.important ? 'Remove importance' : 'Mark as important') + '">' + icon('star') + '</button></div>';
+}
+function goalRowHTML(g) {
+  const h = hueOf(g), mz = measure(g.id), p = pct(g.id);
+  const right = g.done ? '<span class="pc" style="color:var(--ok)">done</span>'
+    : mz.p === null ? '<span class="pc">empty</span>'
+    : '<span class="mini"><i style="width:' + p + '%"></i></span><span class="pc">' + (mz.how === 'metric' ? esc(metricText(g)) : p + '%') + '</span>';
+  return '<button class="grow-row" data-act="focus" data-id="' + g.id + '" style="--h:' + h + '"><i class="hdot"></i><span class="t">' + esc(g.title) + '</span>' + right + icon('right', 'sm muted') + '</button>';
+}
+function renderPanel() {
+  const panel = $('#gpanel');
+  const f = UI.focus, g = f ? G(f) : null;
+  const hue = g ? hueOf(g) : HUES.blue;
+  const mz = measure(f), p = pct(f), ms = mz.p !== null;
+  const peekVal = g && g.done ? 'Achieved' : g && mz.how === 'metric' ? metricText(g) : ms ? p + '%' : '';
+  let h = '<button class="peek" data-act="sheet"><span class="hdot" style="--h:' + hue + '"></span><span class="t">' + esc(g ? g.title : 'Your life') + '</span><span class="p">' + esc(peekVal) + '</span>' + icon('up') + '</button><div class="pp" style="--h:' + hue + '">';
+  if (!g) {
+    const vs = kidsOf(null), bt = branchTasks(null), floating = S.tasks.filter(t => !t.goal_id && !t.done).length;
+    h += '<div class="ptier"><b>Overview</b></div><div style="font-size:22px;font-weight:700">Your life</div>' +
+      (ms ? '<div><div class="pbar"><i style="width:' + p + '%"></i></div><div class="pstat"><span>' + p + '% overall</span><span>' + bt.filter(t => t.done).length + '/' + bt.length + ' goal tasks done</span></div></div>' : '') +
+      '<section><div class="sec-h">Goals <span class="n">' + vs.length + '</span></div>' + vs.map(goalRowHTML).join('') +
+      '<label class="addrow">' + icon('plus') + '<input data-add="goal" placeholder="Add a goal" autocomplete="off"></label></section>' +
+      '<button class="btn ghost" data-act="openAdd" data-t="goal">' + icon('sparkle', 'sm') + 'Browse goal ideas</button>' +
+      (floating ? '<button class="grow-row" data-act="view" data-v="all"><i class="hdot" style="--h:#8b98a9"></i><span class="t">' + floating + ' unassigned task' + (floating === 1 ? '' : 's') + ' floating on the map</span>' + icon('right', 'sm muted') + '</button>' : '') +
+      '<p class="small muted">How progress works: a goal\'s percent is the average of what is inside it. Sub-goals count by their own percent, tasks count once checked off (steps give partial credit), and repeating tasks are left out because they are habits. A goal with nothing inside yet shows no percent. For goals like saving money or reading books, switch it to track a number instead.</p>';
+  } else {
+    const kids = kidsOf(g.id), ts = tasksOf(g.id).sort((a, b) => (a.done - b.done) || ((b.sort || 0) - (a.sort || 0)));
+    const parent = g.parent_id ? G(g.parent_id) : null, isNum = +g.metric_target > 0;
+    let how = '';
+    if (g.done) how = 'Marked achieved';
+    else if (mz.how === 'metric') how = 'Tracking a number';
+    else if (mz.how === 'rollup') how = 'Average of ' + [mz.goals ? mz.goals + ' sub-goal' + (mz.goals === 1 ? '' : 's') : '', mz.tasks ? mz.tasks + ' task' + (mz.tasks === 1 ? '' : 's') : ''].filter(Boolean).join(' and ') + (mz.repeats ? ', repeating tasks not counted' : '');
+    h += '<div class="ptier"><i class="hdot"></i><b>' + levelLong(g.tier) + '</b>' + (parent ? '<span>in</span><button data-act="focus" data-id="' + parent.id + '">' + esc(parent.title) + '</button>' : '') + '</div>' +
+      '<textarea class="ptitle" rows="1" data-gfield="title" aria-label="Goal name">' + esc(g.title) + '</textarea>' +
+      (ms ? '<div><div class="pbar"><i style="width:' + Math.round(mz.p * 100) + '%"></i></div><div class="pstat"><span>' + (g.done ? '100%' : Math.round(mz.p * 100) + '%') + (mz.how === 'metric' && !g.done ? ' \u00b7 ' + esc(metricText(g)) : '') + '</span><span>' + esc(how) + '</span></div></div>'
+          : '<div class="nomeasure">Nothing to measure yet. Add a sub-goal or task, or track a number below.' + (mz.repeats ? ' Repeating tasks are habits, so they do not count toward percent.' : '') + '</div>') +
+      '<div class="card"><div class="frow">' + icon('note') + '<div class="grow"><textarea rows="2" data-gfield="note" placeholder="Why this matters">' + esc(g.note || '') + '</textarea></div></div>' +
+      '<div class="frow">' + icon('cal') + '<span class="grow">Target date</span><input type="date" data-gfield="target_date" value="' + (g.target_date || '') + '"></div>' +
+      (g.tier === 1 ? '<div class="frow">' + icon('target') + '<span class="grow">Color</span><span class="swatches">' + HUE_KEYS.map(k => '<button class="swatch ' + (g.color === k ? 'on' : '') + '" style="--h:' + HUES[k] + '" data-act="color" data-c="' + k + '" aria-label="' + k + '"></button>').join('') + '</span></div>' : '') +
+      '<div class="frow">' + icon('sort') + '<span class="grow">Measure by</span><select class="sel" data-gfield="measure"><option value="rollup"' + (isNum ? '' : ' selected') + '>What is inside it</option><option value="number"' + (isNum ? ' selected' : '') + '>A number</option></select></div>' +
+      (isNum ? '<div class="frow metric"><button class="iconbtn" data-act="metricStep" data-n="-1" aria-label="Decrease">-</button><input type="number" min="0" step="any" data-gfield="metric_current" value="' + (+g.metric_current || 0) + '" aria-label="Current"><span>of</span><input type="number" min="0" step="any" data-gfield="metric_target" value="' + (+g.metric_target) + '" aria-label="Target"><input type="text" class="unit" data-gfield="metric_unit" placeholder="unit" value="' + esc(g.metric_unit || '') + '" aria-label="Unit"><button class="iconbtn" data-act="metricStep" data-n="1" aria-label="Increase">+</button></div>' : '') +
+      '</div>' +
+      '<button class="btn ' + (g.done ? 'good' : 'ghost') + '" data-act="achieve">' + icon('check', 'sm') + (g.done ? 'Achieved' : 'Mark achieved') + '</button>';
+    if (g.tier < MAX_DEPTH) h += '<section><div class="sec-h">Sub-goals <span class="n">' + kids.length + '</span></div>' + kids.map(goalRowHTML).join('') +
+      '<label class="addrow">' + icon('plus') + '<input data-add="goal" placeholder="Add a sub-goal" autocomplete="off"></label></section>';
+    h += '<section id="panelTasks"><div class="sec-h">Tasks <span class="n">' + ts.filter(t => !t.done).length + ' open</span></div>' + ts.map(t => taskRowHTML(t, { showGoal: false })).join('') +
+      '<label class="addrow">' + icon('plus') + '<input data-add="task" placeholder="Add a task" autocomplete="off"></label></section>' +
+      '<button class="btn ghost" data-act="openAdd">' + icon('sparkle', 'sm') + 'Suggestions for this ' + levelName(g.tier).toLowerCase() + '</button>' +
+      '<button class="btn danger" data-act="delGoal">' + icon('trash', 'sm') + 'Delete ' + levelName(g.tier).toLowerCase() + '</button>';
+  }
+  h += '</div>';
+  const scroll = panel.scrollTop, act = document.activeElement, addKind = act && act.dataset && act.dataset.add;
+  const open = panel.classList.contains('open');
+  panel.innerHTML = h; panel.scrollTop = scroll; panel.classList.toggle('open', open);
+  $$('.ptitle', panel).forEach(autosize);
+  if (addKind) { const i = $('[data-add="' + addKind + '"]', panel); if (i) i.focus(); }
+}
+function autosize(el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; }
+
+/* ---------------- tasks view ---------------- */
+function viewTitle(v) {
+  if (UI.q) return { title: 'Search', sub: 'Results for "' + UI.q + '"' };
+  const s = SMART.find(x => x.v === v);
+  if (v === 'myday') return { title: 'My Day', sub: fmtLong(today()) };
+  if (v === 'linked') return { title: 'From goals', sub: 'Every task connected to a vision, milestone, or objective' };
+  if (s) return { title: s.name, sub: '' };
+  const l = L(v.slice(5)); return { title: l ? l.name : 'List', sub: '', list: l };
+}
+function sortTasks(arr, mode) {
+  const byCreated = (a, b) => String(b.created_at).localeCompare(String(a.created_at));
+  const fns = {
+    created: byCreated,
+    due: (a, b) => (a.due ? 0 : 1) - (b.due ? 0 : 1) || String(a.due).localeCompare(String(b.due)) || byCreated(a, b),
+    important: (a, b) => (b.important - a.important) || byCreated(a, b),
+    alpha: (a, b) => a.title.localeCompare(b.title)
+  };
+  return arr.sort(fns[mode] || byCreated);
+}
+function renderTasks() {
+  const v = UI.view, meta = viewTitle(v);
+  const sortMode = UI.sorts[v] || (v === 'planned' ? 'due' : 'created');
+  let head = '<button class="iconbtn menu-btn" data-act="openSide" aria-label="Open menu">' + icon('menu') + '</button><div class="tt">';
+  if (meta.list && UI.renaming) head += '<div class="h1"><input id="renameInput" value="' + esc(meta.list.name) + '" aria-label="List name"></div>';
+  else head += '<div class="h1">' + esc(meta.title) + '</div>';
+  head += (meta.sub ? '<div class="tsub">' + esc(meta.sub) + '</div>' : '') + '</div><div class="tools">';
+  if (!UI.q) head += '<label class="chip" title="Sort">' + icon('sort', 'sm') + '<select data-act-change="sort" aria-label="Sort">' +
+    [['created', 'Newest'], ['due', 'Due date'], ['important', 'Importance'], ['alpha', 'A to Z']].map(o => '<option value="' + o[0] + '"' + (o[0] === sortMode ? ' selected' : '') + '>' + o[1] + '</option>').join('') + '</select></label>';
+  if (meta.list) head += '<button class="iconbtn" data-act="renameList" title="Rename list">' + icon('pencil') + '</button><button class="iconbtn" data-act="deleteList" title="Delete list">' + icon('trash') + '</button>';
+  head += '</div>';
+  $('#thead').innerHTML = head;
+  if (UI.renaming) { const r = $('#renameInput'); if (r) { r.focus(); r.select(); } }
+
+  let arr = UI.q ? S.tasks.filter(t => (t.title + ' ' + (t.note || '')).toLowerCase().indexOf(UI.q.toLowerCase()) >= 0) : S.tasks.filter(viewFilter(v));
+  const open = sortTasks(arr.filter(t => !t.done), sortMode), done = arr.filter(t => t.done).sort((a, b) => String(b.done_at).localeCompare(String(a.done_at)));
+  const showList = v !== 'inbox' && v.indexOf('list:') !== 0;
+  const row = t => taskRowHTML(t, { showList: showList, view: v });
+  let h = '';
+  if (!UI.q && v !== 'linked') {
+    const d = UI.draft;
+    h += '<div class="addbar ' + (d.due || d.important || d.goal ? 'has' : '') + '"><div class="top">' + icon('plus') + '<input id="addInput" placeholder="Add a task" autocomplete="off"></div><div class="opts">' +
+      '<label class="chip ' + (d.due ? 'on' : '') + '">' + icon('cal', 'sm') + (d.due ? fmtShort(d.due) : 'Due date') + '<input type="date" id="draftDue" value="' + (d.due || '') + '"></label>' +
+      '<button class="chip ' + (d.important ? 'on' : '') + '" data-act="draftStar">' + icon('star', 'sm') + 'Important</button>' +
+      '<label class="chip ' + (d.goal ? 'on' : '') + '">' + icon('target', 'sm') + '<select id="draftGoal" aria-label="Link to goal"><option value="">Link to goal</option>' + goalOptions(d.goal) + '</select></label>' +
+      '</div></div>';
+  }
+  if (v === 'myday' && !UI.q) {
+    const sug = S.tasks.filter(t => !t.done && t.my_day !== today() && t.due && dayDiff(t.due) <= 0).slice(0, 6);
+    if (sug.length) h += '<div class="suggest"><div class="sec-h" style="margin:0 0 4px">' + icon('sun', 'sm c-day') + 'Suggested for today</div>' + sug.map(t =>
+      '<div class="srow"><span class="t">' + esc(t.title) + '</span><span class="small ' + (dayDiff(t.due) < 0 ? 'meta over' : 'muted') + '">' + (dayDiff(t.due) < 0 ? 'Overdue' : 'Due today') + '</span><button class="chip" data-act="toMyDay" data-id="' + t.id + '">' + icon('plus', 'sm') + 'Add</button></div>').join('') + '</div>';
+  }
+  if (!open.length && !done.length) {
+    const E = { myday: ['Focus on your day', 'Add what you want to get done today, or pull in something suggested.'], important: ['Nothing starred', 'Star a task to see it here.'], planned: ['Nothing scheduled', 'Tasks with a due date show up here.'], linked: ['No goal tasks yet', 'Open a goal in Goals and add tasks to it. They show up here and in your lists.'] };
+    const e = UI.q ? ['No matches', 'Try a different word.'] : (E[v] || ['All clear', 'Add a task to get started.']);
+    h += '<div class="empty"><div class="big">' + e[0] + '</div>' + e[1] + '</div>';
+  } else if (v === 'planned' && !UI.q) {
+    const groups = [['Overdue', t => dayDiff(t.due) < 0, 'over'], ['Today', t => dayDiff(t.due) === 0], ['Tomorrow', t => dayDiff(t.due) === 1], ['This week', t => dayDiff(t.due) > 1 && dayDiff(t.due) <= 7], ['Later', t => dayDiff(t.due) > 7]];
+    groups.forEach(gr => { const items = open.filter(gr[1]); if (items.length) h += '<div class="group-h ' + (gr[2] || '') + '">' + gr[0] + ' <span class="mono small muted">' + items.length + '</span></div>' + items.map(row).join(''); });
+  } else h += open.map(row).join('');
+  if (done.length) {
+    const shown = !!UI.showDone[v];
+    h += '<button class="sec-toggle ' + (shown ? '' : 'closed') + '" data-act="toggleDone">' + icon('down', 'sm') + 'Completed <span class="mono small muted">' + done.length + '</span></button>' + (shown ? done.map(row).join('') : '');
+  }
+  const ai = document.activeElement && document.activeElement.id === 'addInput' ? document.activeElement.value : null;
+  $('#tlist').innerHTML = h;
+  if (ai !== null) { const i = $('#addInput'); i.value = ai; i.focus(); }
+}
+function goalOptions(sel) {
+  let h = '';
+  const walk = (id, depth) => kidsOf(id).forEach(g => { h += '<option value="' + g.id + '"' + (g.id === sel ? ' selected' : '') + '>' + '\u00a0\u00a0\u00a0'.repeat(depth) + esc(g.title) + '</option>'; walk(g.id, depth + 1); });
+  walk(null, 0); return h;
+}
+function addFromBar() {
+  const inp = $('#addInput'); const v = inp.value.trim(); if (!v) return;
+  const f = { title: v }, view = UI.view, d = UI.draft;
+  if (view === 'myday') f.my_day = today();
+  if (view === 'important') f.important = true;
+  if (view === 'planned') f.due = today();
+  if (view.indexOf('list:') === 0) f.list_id = view.slice(5);
+  if (d.due) f.due = d.due; if (d.important) f.important = true; if (d.goal) f.goal_id = d.goal;
+  addTask(f); inp.value = ''; UI.draft = { due: null, important: false, goal: '' };
+  render(); $('#addInput').focus();
+}
+
+/* ---------------- task drawer ---------------- */
+function renderDrawer() {
+  const dr = $('#drawer'), t = UI.openTask ? T(UI.openTask) : null;
+  $('#scrim').classList.toggle('on', !!t); dr.classList.toggle('on', !!t);
+  if (!t) return;
+  if (dr.dataset.id === t.id && dr.contains(document.activeElement) && document.activeElement.matches('input[type=text],textarea')) { refreshDrawerBits(t); return; }
+  dr.dataset.id = t.id;
+  const g = t.goal_id ? G(t.goal_id) : null;
+  const where = g ? pathOf(g.id).map(x => x.title).join(' / ') : (t.list_id ? (L(t.list_id) || {}).name : 'Tasks');
+  const myday = t.my_day === today();
+  let h = '<div class="dhead"><button class="iconbtn" data-act="closeDrawer" aria-label="Close">' + icon('x') + '</button><span class="where">' + (g ? '<i class="hdot" style="--h:' + hueOf(g) + ';display:inline-block;margin-right:6px"></i>' : '') + esc(where) + '</span></div><div class="dbody">';
+  h += '<div class="card"><div class="dtitle"><button class="chk ' + (t.done ? 'on' : '') + '" data-act="toggleTask" data-id="' + t.id + '" aria-label="Toggle complete">' + icon('check') + '</button>' +
+    '<textarea rows="1" data-tfield="title" aria-label="Task title">' + esc(t.title) + '</textarea>' +
+    '<button class="star ' + (t.important ? 'on' : '') + '" data-act="starTask" data-id="' + t.id + '" aria-label="Important">' + icon('star') + '</button></div>' +
+    (t.steps || []).map(s => '<div class="step ' + (s.done ? 'done' : '') + '"><button class="chk ' + (s.done ? 'on' : '') + '" data-act="toggleStep" data-sid="' + s.id + '" aria-label="Toggle step">' + icon('check') + '</button><input type="text" data-step="' + s.id + '" value="' + esc(s.t) + '" aria-label="Step"><button class="iconbtn x" data-act="delStep" data-sid="' + s.id + '" aria-label="Delete step">' + icon('x', 'sm') + '</button></div>').join('') +
+    '<div class="step">' + icon('plus', 'sm') + '<input type="text" id="addStep" placeholder="' + ((t.steps || []).length ? 'Next step' : 'Add a step') + '" autocomplete="off"></div></div>';
+  h += '<div class="card"><button class="frow ' + (myday ? 'on' : '') + '" data-act="myDayToggle" style="width:100%">' + icon('sun') + '<span class="grow">' + (myday ? 'Added to My Day' : 'Add to My Day') + '</span>' + (myday ? icon('x', 'sm') : '') + '</button></div>';
+  h += '<div class="card"><div class="frow">' + icon('cal') + '<span class="grow">Due</span><input type="date" data-tfield="due" value="' + (t.due || '') + '"></div>' +
+    '<div class="qchips"><button data-act="quickDue" data-n="0">Today</button><button data-act="quickDue" data-n="1">Tomorrow</button><button data-act="quickDue" data-n="7">Next week</button>' + (t.due ? '<button data-act="quickDue" data-n="clear">Clear</button>' : '') + '</div>' +
+    '<div class="frow">' + icon('repeat') + '<span class="grow">Repeat</span><select class="sel" data-tfield="repeat">' + Object.keys(REPEATS).map(k => '<option value="' + k + '"' + ((t.repeat || '') === k ? ' selected' : '') + '>' + REPEATS[k] + '</option>').join('') + '</select></div></div>';
+  h += '<div class="card"><div class="frow">' + icon('target') + '<span class="grow">Goal</span><select class="sel" data-tfield="goal_id" style="max-width:62%"><option value="">None</option>' + goalOptions(t.goal_id) + '</select></div>' +
+    '<div class="frow">' + icon('list') + '<span class="grow">List</span><select class="sel" data-tfield="list_id"><option value="">Tasks</option>' + S.lists.slice().sort(bySort).map(l => '<option value="' + l.id + '"' + (t.list_id === l.id ? ' selected' : '') + '>' + esc(l.name) + '</option>').join('') + '</select></div></div>';
+  h += '<div class="card"><div class="frow" style="align-items:flex-start">' + icon('note') + '<div class="grow"><textarea rows="4" data-tfield="note" placeholder="Add a note">' + esc(t.note || '') + '</textarea></div></div></div>';
+  h += '</div><div class="dfoot"><span>Created ' + new Date(t.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) + '</span><button class="iconbtn" data-act="delTask" aria-label="Delete task" style="color:var(--danger)">' + icon('trash') + '</button></div>';
+  const focusStep = document.activeElement && document.activeElement.id === 'addStep';
+  dr.innerHTML = h;
+  $$('textarea[data-tfield="title"]', dr).forEach(autosize);
+  if (focusStep) $('#addStep').focus();
+}
+function refreshDrawerBits(t) { const c = $('.dtitle .chk', $('#drawer')); if (c) c.classList.toggle('on', t.done); }
+
+
+/* =====================================================================
+   GOAL LIBRARY
+   @Category, # goal, ## sub-goal, ### deeper, - task.
+   "| words" after a title are search aliases. "{10000 $}" = track a number.
+   ===================================================================== */
+const LIB_TEXT = `
+@Education
+# Earn a bachelor's degree | college degree university undergrad bachelor
+## Get accepted to a college
+- Shortlist 8 schools that fit my budget and major
+- Take the SAT or ACT
+- Write my application essay
+- Ask 2 teachers or managers for recommendation letters
+- Submit every application before its deadline
+## Pay for school without heavy debt
+- Fill out the FAFSA
+- Apply to 5 scholarships
+- Compare financial aid offers side by side
+## Keep a 3.5+ GPA {3.5 GPA}
+- Set a weekly study schedule
+- Go to office hours every week
+- Join a study group
+## Finish all degree requirements
+- Map every required course with an advisor
+- Register for classes the day registration opens
+- Complete an internship
+- Apply for graduation
+# Earn a master's degree | graduate grad mba masters
+## Choose the right program
+- Compare 5 programs on cost, format and outcomes
+- Talk to 2 current students or alumni
+## Get admitted
+- Take the GRE or GMAT if required
+- Write my statement of purpose
+- Secure 3 recommendation letters
+- Submit applications
+## Fund the degree
+- Ask HR about tuition assistance
+- Apply for assistantships and scholarships
+## Complete the program
+- Finish the core courses
+- Complete the capstone or thesis
+# Get into medical school | doctor physician med medicine
+## Complete pre-med coursework
+- Finish the biology and chemistry sequences
+- Take organic chemistry and biochemistry
+## Score 510+ on the MCAT
+- Take a diagnostic practice test
+- Build a 3 month study schedule
+- Take a full-length practice test every weekend
+- Book the test date
+## Build clinical and service experience {150 hours}
+- Apply to volunteer at a hospital or clinic
+- Shadow 2 physicians
+- Log hours in a tracker
+## Apply through AMCAS
+- Write my personal statement
+- Request letters of recommendation
+- Submit the primary application
+- Complete secondary applications
+- Practice for interviews
+# Learn a new language | spanish french arabic japanese german fluent
+## Master the basics
+- Learn the 500 most common words
+- Finish a beginner course
+## Practice every day {100 days}
+- Do 15 minutes of practice
+## Hold a 10 minute conversation
+- Book a weekly tutor session
+- Join a language exchange
+## Earn a language certificate
+- Book the certification exam
+# Earn a professional certification | cert certified exam license pmp
+## Pick the right certification
+- Research which certs employers ask for
+- Confirm the eligibility requirements
+## Prepare for the exam {40 hours}
+- Buy the official study guide
+- Take a practice exam
+- Block 5 study hours a week on my calendar
+## Pass the exam
+- Schedule the exam
+- Take the exam
+## Keep it active
+- Track continuing education credits
+
+@Career
+# Land a new job | hired employment offer job search
+## Get my materials ready
+- Update my resume
+- Refresh my LinkedIn profile
+- Write a cover letter template
+## Build a target list
+- List 20 companies I want to work for
+- Set up job alerts
+## Apply and network {30 applications}
+- Apply to 5 jobs this week
+- Message 3 people in my target field
+- Ask for referrals
+## Win the interviews
+- Prepare 6 STAR stories
+- Do a mock interview
+- Research each company before its interview
+- Send thank you notes
+## Negotiate the offer
+- Research market pay for the role
+- Negotiate base pay and benefits
+# Get promoted | promotion raise level
+## Know what the next level requires
+- Ask my manager what promotion looks like
+- Get the leveling criteria in writing
+## Deliver visible wins
+- Lead one high impact project
+- Share results in a monthly update
+## Build support
+- Find a sponsor above my manager
+- Ask for feedback every quarter
+## Make the case
+- Document my accomplishments
+- Request a promotion conversation
+# Switch careers | career change pivot transition
+## Choose the new field
+- Research 3 possible fields
+- Interview 3 people who work in them
+## Build the skills
+- Complete a course or bootcamp
+- Build 2 portfolio projects
+## Get real experience
+- Take on a freelance or volunteer project
+## Make the move
+- Rewrite my resume for the new field
+- Apply to 20 roles
+# Grow my professional network | networking connections mentor
+## Meet people in my field {24 conversations}
+- Go to one industry event a month
+- Schedule 2 coffee chats a month
+## Find a mentor
+- List 3 people I would learn from
+- Ask one of them for a monthly call
+## Build a visible presence
+- Post on LinkedIn every other week
+
+@Health & fitness
+# Get in the best shape of my life | fit fitness strong shape athletic
+## Train consistently {150 workouts}
+- Plan a weekly training split
+- Put workouts on my calendar
+## Build strength
+- Test my current lifts
+- Follow a progressive overload program
+## Build endurance
+- Do cardio 3 times a week
+## Recover well
+- Sleep 7+ hours a night
+- Take one full rest day a week
+# Lose weight in a healthy way | lose weight fat body
+## Set a realistic target
+- Record a baseline weight and measurements
+- Talk to a doctor about a healthy target
+## Improve my eating
+- Plan meals every Sunday
+- Cook at home 5 nights a week
+- Swap sugary drinks for water
+## Move more
+- Walk 8,000 steps a day
+- Strength train twice a week
+## Track progress
+- Weigh in once a week
+- Take monthly progress photos
+# Run a half marathon | run running race marathon 5k 10k
+## Build a running base
+- Run 3 times a week for 4 weeks
+## Follow a training plan
+- Pick a 12 week plan
+- Do a long run every weekend
+## Be race day ready
+- Register for a race
+- Get fitted for running shoes
+- Run 10 miles in training
+# Earn my next martial arts belt | bjj jiu jitsu karate judo taekwondo belt grappling
+## Train consistently {100 classes}
+- Attend 3 classes a week
+## Sharpen my technique
+- Drill one technique each week
+- Film and review my rolls or sparring
+## Test my skills
+- Compete in a local tournament
+- Ask my coach what I need for promotion
+# Build healthier habits | healthy habit wellness sleep stress
+## Sleep better
+- Set a consistent bedtime
+- No screens 30 minutes before bed
+## Drink less alcohol
+- Pick alcohol-free days for the week
+## Lower my stress
+- Meditate 10 minutes a day
+- Schedule time outdoors
+## Stay on top of checkups
+- Book an annual physical
+- Book a dental cleaning
+
+@Money
+# Build an emergency fund | savings save rainy day
+## Save three months of expenses {10000 $}
+- Calculate my monthly essential expenses
+- Open a high-yield savings account
+- Automate a transfer every payday
+## Cut spending
+- Review last month's transactions
+- Cancel unused subscriptions
+# Pay off my debt | debt loan credit card payoff
+## Know exactly what I owe
+- List every debt with its balance and rate
+- Pick the avalanche or snowball method
+## Free up cash
+- Build a monthly budget
+- Find $200 a month to redirect to debt
+## Pay it down
+- Make an extra payment on the target debt
+- Call lenders to ask for a lower rate
+## Stay debt free
+- Set up autopay on every bill
+# Invest for the future | investing retirement stocks 401k ira wealth
+## Learn the basics
+- Read one beginner investing book
+- Understand index funds and fees
+## Use tax-advantaged accounts
+- Contribute enough to get the full 401(k) match
+- Open a Roth IRA
+## Invest consistently
+- Set up automatic monthly investments
+- Rebalance once a year
+# Buy a home | house condo mortgage homeowner
+## Get mortgage ready
+- Check my credit report
+- Get pre-approved
+## Save the down payment {40000 $}
+- Open a dedicated savings account
+- Automate monthly deposits
+## Find the right home
+- List must-haves and deal breakers
+- Choose a real estate agent
+- Tour 10 homes
+## Close the deal
+- Make an offer
+- Schedule the inspection
+- Close and get the keys
+
+@Business
+# Start a side business | side hustle startup online business income
+## Validate the idea
+- Write down the problem and who has it
+- Talk to 10 potential customers
+- Study 5 competitors
+## Set up the business
+- Choose a name
+- Register the business
+- Open a business bank account
+## Launch
+- Build a simple website or landing page
+- Get my first paying customer
+## Reach $1,000 a month {1000 $}
+- Pick one marketing channel to focus on
+- Ask happy customers for referrals
+# Open a brick-and-mortar business | gym shop studio store restaurant location
+## Write the business plan
+- Estimate startup costs
+- Build a 3 year financial forecast
+## Secure funding
+- Talk to a lender about an SBA loan
+- Pitch investors or partners
+## Find the location
+- Tour 5 locations
+- Negotiate the lease
+## Open the doors
+- Get permits and licenses
+- Hire the first staff
+- Plan a grand opening
+# Buy an existing business | acquisition acquire bizbuysell
+## Define what I'm looking for
+- Set a budget and industry criteria
+## Find deals
+- Browse listings every week
+- Contact 3 business brokers
+## Evaluate the best deal
+- Review 3 years of financials
+- Hire an accountant for due diligence
+## Close the purchase
+- Arrange financing
+- Sign the purchase agreement
+
+@Relationships
+# Strengthen my relationship | partner marriage spouse girlfriend boyfriend wife husband
+## Make quality time a habit
+- Plan a weekly date night
+- Put phones away at dinner
+## Communicate better
+- Have a monthly check-in conversation
+## Plan our future together
+- Talk through our 5 year goals
+# Be a more present parent | kids children family parenting
+## Spend one-on-one time
+- Plan a weekly outing with each kid
+## Build family routines
+- Have family dinner 4 nights a week
+# Grow my friendships | friends social community
+## Reconnect
+- Message 3 old friends
+## Build a routine
+- Host a monthly get-together
+- Join a club or class
+# Plan our wedding | wedding married marry engagement
+## Set the foundation
+- Set a budget
+- Pick a date
+- Draft the guest list
+## Book the big pieces
+- Book the venue
+- Book a photographer
+- Book catering
+## Finish the details
+- Send invitations
+- Plan the ceremony
+
+@Personal growth
+# Read more books | read reading books
+## Read 24 books this year {24 books}
+- Pick my next 3 books
+- Read 20 minutes before bed
+## Remember what I read
+- Keep notes on each book
+# Build a morning routine | morning routine wake early discipline
+## Wake up at the same time {30 days}
+- Set a fixed alarm
+## Design the routine
+- Choose 3 morning habits
+# Learn a new skill | skill learn coding design course
+## Pick a learning path
+- Choose a course or book
+## Practice {50 hours}
+- Practice 3 times a week
+## Show what I learned
+- Finish a project using the skill
+# Become a confident speaker | public speaking speech presentation confidence
+## Practice in low stakes settings
+- Join Toastmasters or a speaking group
+## Speak in public
+- Give a talk at work or a meetup
+
+@Home & living
+# Move to a new place | move apartment relocate
+## Plan the move
+- Set a moving budget
+- Pick a move date
+## Find the place
+- List must-haves
+- Tour 5 places
+- Sign the lease
+## Move in
+- Book movers
+- Pack room by room
+- Update my address
+# Get organized at home | declutter organize clean
+## Declutter
+- Declutter one room each weekend
+- Donate what I don't use
+## Set up systems
+- Create a weekly cleaning schedule
+# Renovate a room | renovate remodel kitchen bathroom
+## Plan it
+- Set a budget
+- Collect design ideas
+## Hire and build
+- Get 3 contractor quotes
+- Order materials
+
+@Travel
+# Take a dream trip | trip vacation travel
+## Plan it
+- Pick the destination and dates
+- Set a travel budget
+## Save for it {3000 $}
+- Automate savings for the trip
+## Book it
+- Book flights
+- Book places to stay
+- Check passport and visa requirements
+# Visit 10 new countries | countries travel world
+## Plan this year's trips {10 countries}
+- Choose the next 2 destinations
+
+@Creative
+# Write a book | author novel writing
+## Outline it
+- Define the core idea in one paragraph
+- Outline every chapter
+## Write the first draft {50000 words}
+- Write 500 words a day
+## Revise
+- Finish a second draft
+- Get feedback from 3 readers
+## Publish
+- Decide on traditional or self-publishing
+- Publish the book
+# Launch a YouTube channel or podcast | youtube podcast content creator channel
+## Set up
+- Pick a niche
+- Get basic gear
+## Publish consistently {50 episodes}
+- Publish one episode a week
+## Grow the audience
+- Share every episode on social
+# Learn an instrument | guitar piano drums music instrument
+## Get started
+- Get an instrument
+- Book a first lesson
+## Practice {100 hours}
+- Practice 20 minutes a day
+## Perform
+- Learn 5 full songs
+- Play for friends
+`;
+const STOP = new Set('a an the to my of for and in on at be get make become more new i with by from our your me it as'.split(' '));
+const toks = str => String(str).toLowerCase().replace(/[^a-z0-9 ]/g, ' ').split(/\s+/).filter(w => w && !STOP.has(w)).map(w => w.length > 4 ? w.replace(/(ing|s)$/, '') : w);
+const slug = str => String(str).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+const LIBMAP = {};
+const LIB = (function parse(txt) {
+  const cats = []; let cat = null; const stack = [];
+  txt.split('\n').forEach(raw => {
+    const l = raw.trim(); if (!l) return;
+    if (l[0] === '@') { cat = { name: l.slice(1).trim(), goals: [] }; cats.push(cat); stack.length = 0; return; }
+    const m = l.match(/^(#+)\s*(.*)$/);
+    if (m && cat) {
+      const d = m[1].length; let title = m[2], aliases = '', metric = null;
+      const bar = title.indexOf(' | '); if (bar > -1) { aliases = title.slice(bar + 3); title = title.slice(0, bar); }
+      const mm = title.match(/\{\s*([\d.]+)\s*([^}]*)\}\s*$/);
+      if (mm) { metric = { target: +mm[1], unit: mm[2].trim() }; title = title.replace(mm[0], '').trim(); }
+      stack.length = d - 1; const parent = stack[d - 2];
+      const node = { type: 'goal', title: title, metric: metric, children: [], cat: cat.name, key: (parent ? parent.key + '/' : slug(cat.name) + ':') + slug(title) };
+      node.words = new Set(toks(title + ' ' + aliases + (parent ? '' : ' ' + cat.name)));
+      (parent ? parent.children : cat.goals).push(node); stack[d - 1] = node; LIBMAP[node.key] = node; return;
+    }
+    if (l[0] === '-' && stack.length) stack[stack.length - 1].children.push({ type: 'task', title: l.slice(1).trim(), children: [] });
+  });
+  return cats;
+})(LIB_TEXT);
+const GENERIC_GOALS = ['Define what done looks like', 'Learn what it takes', 'Build the weekly habit', 'Remove the biggest obstacle', 'Find a mentor or community', 'Hit a first small win'];
+const GENERIC_TASKS = ['Write down why this matters', 'Research the first step', 'Block time on my calendar', 'Tell someone for accountability', 'Review progress on Sunday', 'Set a target date'];
+function libNodeFor(g) {
+  if (g.template_key && LIBMAP[g.template_key]) return LIBMAP[g.template_key];
+  const gt = new Set(toks(g.title)); if (!gt.size) return null;
+  let best = null, bs = 0;
+  Object.keys(LIBMAP).forEach(k => {
+    const n = LIBMAP[k]; let hit = 0; gt.forEach(w => { if (n.words.has(w)) hit++; });
+    const sc = hit / gt.size - n.words.size * 0.001;
+    if (sc > bs) { bs = sc; best = n; }
+  });
+  return bs >= 0.5 ? best : null;
+}
+
+/* =====================================================================
+   ADD SHEET (goal or task, with suggestions)
+   ===================================================================== */
+UI.add = null;
+function openAdd(parentId, type) {
+  const g = parentId ? G(parentId) : null, canGoal = !g || g.tier < MAX_DEPTH;
+  let t = type;
+  if (!t && g) { const n = libNodeFor(g); if (n && n.children.length && n.children.every(c => c.type === 'task')) t = 'task'; }
+  UI.add = { parent: parentId || null, type: canGoal ? (t || 'goal') : 'task', cat: LIB[0].name, ai: null, list: [] };
+  renderAddSheet();
+  setTimeout(() => { const i = $('#addSheetInput'); if (i && window.innerWidth > 860) i.focus(); }, 60);
+}
+function closeAdd() { UI.add = null; renderAddSheet(); }
+function suggestionsFor(a) {
+  const g = a.parent ? G(a.parent) : null;
+  const have = new Set((g ? kidsOf(g.id).map(k => k.title).concat(tasksOf(g.id).map(t => t.title)) : kidsOf(null).map(k => k.title)).map(x => x.toLowerCase()));
+  const fresh = arr => arr.filter(n => !have.has(n.title.toLowerCase()));
+  if (!g) {
+    if (a.type === 'task') return { label: '', items: [] };
+    const cat = LIB.find(c => c.name === a.cat) || LIB[0];
+    return { label: cat.name + ' goals', items: fresh(cat.goals) };
+  }
+  const node = libNodeFor(g), want = a.type === 'task' ? 'task' : 'goal';
+  let items = node ? fresh(node.children.filter(c => c.type === want)) : [];
+  let label = node ? 'Suggested for "' + node.title + '"' : '';
+  if (!items.length) { items = fresh((want === 'task' ? GENERIC_TASKS : GENERIC_GOALS).map(x => ({ type: want, title: x, children: [] }))); label = 'Ideas that fit most goals'; }
+  return { label: label, items: items };
+}
+function countTree(n) { let g = 0, t = 0; (n.children || []).forEach(c => { if (c.type === 'task') t++; else { g++; const x = countTree(c); g += x.g; t += x.t; } }); return { g: g, t: t }; }
+function sugRow(n, i, src, hue) {
+  const c = countTree(n), hasPlan = n.type === 'goal' && (c.g || c.t);
+  let sub = '';
+  if (hasPlan) sub = [c.g ? c.g + ' sub-goal' + (c.g === 1 ? '' : 's') : '', c.t ? c.t + ' task' + (c.t === 1 ? '' : 's') : ''].filter(Boolean).join(', ');
+  if (n.metric) sub = (sub ? sub + ' \u00b7 ' : '') + 'tracks ' + fmtNum(n.metric.target) + ' ' + n.metric.unit;
+  return '<div class="sug" style="--h:' + hue + '"><i class="ty ' + (n.type === 'task' ? 'task' : '') + '"></i><div class="t">' + esc(n.title) + (sub ? '<small>' + esc(sub) + '</small>' : '') + '</div>' +
+    (hasPlan ? '<button class="mini" data-act="addSug" data-src="' + src + '" data-i="' + i + '" data-plan="0">Just this</button><button class="mini pri" data-act="addSug" data-src="' + src + '" data-i="' + i + '" data-plan="1">Add with plan</button>'
+             : '<button class="mini pri" data-act="addSug" data-src="' + src + '" data-i="' + i + '">Add</button>') + '</div>';
+}
+function aiReady() { return AI_ENABLED && Store.live; }
+function renderAddSheet() {
+  const sh = $('#addSheet'), a = UI.add;
+  $('#addScrim').classList.toggle('on', !!a); sh.classList.toggle('on', !!a);
+  if (!a) return;
+  const g = a.parent ? G(a.parent) : null, canGoal = !g || g.tier < MAX_DEPTH, hue = g ? hueOf(g) : HUES.blue;
+  const old = $('#addSheetInput'), prevVal = old ? old.value : '', hadFocus = document.activeElement === old;
+  const sg = suggestionsFor(a); a.list = sg.items.slice();
+  const where = g ? pathOf(g.id).map(x => esc(x.title)).join(' / ') : 'Your life';
+  let h = '<div class="as-head"><div class="where"><div class="small muted">Add to</div><div class="as-path"><i class="hdot" style="--h:' + hue + '"></i><span>' + where + '</span></div></div><button class="iconbtn" data-act="closeAdd" aria-label="Close">' + icon('x') + '</button></div>';
+  h += '<div class="seg"><button data-act="addType" data-t="goal" class="' + (a.type === 'goal' ? 'on' : '') + '"' + (canGoal ? '' : ' disabled title="Goals go 6 levels deep"') + '>' + (g ? 'Sub-goal' : 'Goal') + '</button><button data-act="addType" data-t="task" class="' + (a.type === 'task' ? 'on' : '') + '">Task</button></div>';
+  const ph = a.type === 'task' ? (g ? 'New task' : 'New task (floats until you link it to a goal)') : (g ? 'Name the sub-goal' : 'Name your goal');
+  h += '<div class="as-input"><input id="addSheetInput" autocomplete="off" placeholder="' + esc(ph) + '"><button class="btn" data-act="addSheetSubmit">Add</button></div><div class="as-body">';
+  if (!g && a.type === 'goal') h += '<div class="cats">' + LIB.map(c => '<button data-act="addCat" data-c="' + esc(c.name) + '" class="' + (c.name === a.cat ? 'on' : '') + '">' + esc(c.name) + '</button>').join('') + '</div>';
+  if (sg.label && a.list.length) h += '<div class="as-label">' + esc(sg.label) + '</div>';
+  h += a.list.map((n, i) => sugRow(n, i, 'lib', hue)).join('');
+  if (!g && a.type === 'task') h += '<p class="small muted" style="padding:4px 2px">Tasks added here float on the main map and show up in your Tasks list. Link one to a goal any time from its details and its bubble moves inside that goal.</p>';
+  if (aiReady() && !(!g && a.type === 'task')) {
+    h += '<div class="as-label">AI ideas</div>';
+    const btnLabel = g ? 'Suggest ' + (a.type === 'task' ? 'tasks' : 'sub-goals') + ' with AI' : 'Plan the goal I typed with AI';
+    if (!a.ai) h += '<button class="btn ghost ai" data-act="aiSuggest">' + icon('sparkle', 'sm') + btnLabel + '</button>';
+    else if (a.ai.loading) h += '<div class="small muted" style="padding:8px 2px">Thinking up ideas...</div>';
+    else if (a.ai.error) h += '<div class="small" style="color:var(--danger);padding:4px 2px">' + esc(a.ai.error) + '</div><button class="btn ghost ai" data-act="aiSuggest">' + icon('sparkle', 'sm') + 'Try again</button>';
+    else h += a.ai.items.map((n, i) => sugRow(n, i, 'ai', hue)).join('') + '<button class="btn ghost ai" data-act="aiSuggest">' + icon('sparkle', 'sm') + 'More ideas</button>';
+  }
+  h += '</div>';
+  sh.innerHTML = h;
+  const inp = $('#addSheetInput'); inp.value = prevVal; if (hadFocus) inp.focus();
+}
+function addSuggestion(src, i, plan) {
+  const a = UI.add; if (!a) return;
+  const list = src === 'ai' ? (a.ai && a.ai.items) : a.list, n = list && list[i]; if (!n) return;
+  if (n.type === 'task') { addTask({ goal_id: a.parent, title: n.title }); toast('Added task "' + n.title + '"'); }
+  else if (plan) { const c = addTree(a.parent, n); toast('Added "' + n.title + '" with ' + Math.max(0, c.goals - 1) + ' sub-goals and ' + c.tasks + ' tasks'); }
+  else { addTree(a.parent, Object.assign({}, n, { children: [] })); toast('Added "' + n.title + '"'); }
+  if (src === 'ai') a.ai.items.splice(i, 1);
+  render(); renderAddSheet();
+}
+function addSheetSubmit() {
+  const a = UI.add, inp = $('#addSheetInput'); if (!a || !inp) return;
+  const v = inp.value.trim(); if (!v) return;
+  if (a.type === 'task') addTask({ goal_id: a.parent, title: v }); else addGoal(a.parent, v);
+  inp.value = ''; render(); renderAddSheet(); $('#addSheetInput').focus();
+}
+async function aiSuggest() {
+  const a = UI.add; if (!a) return;
+  const g = a.parent ? G(a.parent) : null, idea = (($('#addSheetInput') || {}).value || '').trim();
+  if (!g && !idea) { a.ai = { error: 'Type the goal you have in mind first, then tap the AI button.' }; renderAddSheet(); return; }
+  a.ai = { loading: true }; renderAddSheet();
   try {
-    return json(JSON.parse(text.slice(text.indexOf('{'), text.lastIndexOf('}') + 1)));
-  } catch {
-    return json({ error: 'Could not read the AI response' }, 502);
+    const body = { path: g ? pathOf(g.id).map(x => x.title) : [], idea: g ? '' : idea, want: g ? a.type : 'plan',
+      existing: g ? kidsOf(g.id).map(k => k.title).concat(tasksOf(g.id).map(t => t.title)) : kidsOf(null).map(k => k.title),
+      levelsLeft: MAX_DEPTH - (g ? g.tier : 0) };
+    const r = await Store.sb.functions.invoke('suggest', { body: body });
+    if (r.error) throw r.error;
+    const norm = n => ({ type: n.type === 'task' ? 'task' : 'goal', title: String(n.title).slice(0, 90), children: (n.children || []).filter(c => c && c.title).map(norm) });
+    const items = ((r.data && r.data.items) || []).filter(n => n && n.title).map(norm);
+    if (!items.length) throw new Error('No ideas came back. Try again.');
+    if (UI.add === a) { a.ai = { items: items }; renderAddSheet(); }
+  } catch (e) { if (UI.add === a) { a.ai = { error: 'AI ideas did not load: ' + (e.message || e) }; renderAddSheet(); } }
+}
+
+/* =====================================================================
+   EVENTS (delegated; no inline handlers)
+   ===================================================================== */
+function closeSide() { $('#side').classList.remove('open'); $('#sideScrim').classList.remove('on'); }
+function setView(v) { UI.view = v; UI.q = ''; $('#search').value = ''; UI.renaming = false; UI.openTask = null; closeSide(); render(); }
+
+document.addEventListener('click', e => {
+  const a = e.target.closest('[data-act]'); if (!a) return;
+  const act = a.dataset.act, id = a.dataset.id;
+  if (a.tagName === 'LABEL' || a.tagName === 'SELECT') return;
+  switch (act) {
+    case 'view': setView(a.dataset.v); break;
+    case 'openSide': $('#side').classList.add('open'); $('#sideScrim').classList.add('on'); break;
+    case 'closeSide': closeSide(); break;
+    case 'focus': setFocus(id || null); break;
+    case 'centerTap':
+      if (window.innerWidth <= 860) $('#gpanel').classList.add('open');
+      else { const t = $('.ptitle'); if (t) t.focus(); }
+      break;
+    case 'sheet': $('#gpanel').classList.toggle('open'); break;
+    case 'compose': openAdd(UI.focus); break;
+    case 'openAdd': openAdd(UI.focus, a.dataset.t); break;
+    case 'closeAdd': closeAdd(); break;
+    case 'addType': UI.add.type = a.dataset.t; UI.add.ai = null; renderAddSheet(); break;
+    case 'addCat': UI.add.cat = a.dataset.c; renderAddSheet(); break;
+    case 'addSheetSubmit': addSheetSubmit(); break;
+    case 'addSug': addSuggestion(a.dataset.src, +a.dataset.i, a.dataset.plan === '1'); break;
+    case 'aiSuggest': aiSuggest(); break;
+    case 'moreRoot': setView('all'); break;
+    case 'metricStep': {
+      const g = G(UI.focus); const v = Math.max(0, (+g.metric_current || 0) + (+a.dataset.n));
+      updateGoal(g, { metric_current: v }); render();
+      if (v >= +g.metric_target && v - (+a.dataset.n) < +g.metric_target) toast('Target reached for "' + g.title + '"');
+      break;
+    }
+    case 'composerAdd': composerSubmit(); break;
+    case 'composerClose': UI.composer = null; removeComposer(); break;
+    case 'moreTasks': $('#gpanel').classList.add('open'); { const s = $('#panelTasks'); if (s) s.scrollIntoView({ behavior: 'smooth', block: 'start' }); } break;
+    case 'bubbleTask': {
+      UI.burst = 't:' + id; toggleTask(id);
+      setTimeout(() => { UI.burst = null; const el = nodeEls.get('t:' + id); if (el) el.classList.remove('burst'); }, 600);
+      break;
+    }
+    case 'seed': seedExample(); render(); break;
+    case 'achieve': { const g = G(UI.focus); updateGoal(g, { done: !g.done }); render(); if (g.done) toast('"' + g.title + '" achieved'); break; }
+    case 'color': updateGoal(G(UI.focus), { color: a.dataset.c }); render(); break;
+    case 'delGoal': deleteGoal(UI.focus); break;
+    case 'openTask': UI.openTask = id; render(); break;
+    case 'closeDrawer': UI.openTask = null; render(); break;
+    case 'toggleTask': {
+      e.stopPropagation();
+      const row = a.closest('.trow'); const t = T(id);
+      if (row && t && !t.done) { row.classList.add('done'); setTimeout(() => row.classList.add('leaving'), 220); toggleTask(id, { defer: 420 }); }
+      else toggleTask(id);
+      break;
+    }
+    case 'starTask': { const t = T(id); updateTask(t, { important: !t.important }); render(); break; }
+    case 'toMyDay': updateTask(T(id), { my_day: today() }); render(); break;
+    case 'toggleDone': UI.showDone[UI.view] = !UI.showDone[UI.view]; render(); break;
+    case 'draftStar': UI.draft.important = !UI.draft.important; render(); $('#addInput').focus(); break;
+    case 'myDayToggle': { const t = T(UI.openTask); updateTask(t, { my_day: t.my_day === today() ? null : today() }); render(); break; }
+    case 'quickDue': { const t = T(UI.openTask); const n = a.dataset.n; updateTask(t, { due: n === 'clear' ? null : addDays(today(), +n) }); $('#drawer').dataset.id = ''; render(); break; }
+    case 'toggleStep': { const t = T(UI.openTask); const s = t.steps.find(x => x.id === a.dataset.sid); s.done = !s.done; updateTask(t, { steps: t.steps.slice() }); $('#drawer').dataset.id = ''; render(); break; }
+    case 'delStep': { const t = T(UI.openTask); updateTask(t, { steps: t.steps.filter(x => x.id !== a.dataset.sid) }); $('#drawer').dataset.id = ''; render(); break; }
+    case 'delTask': deleteTask(UI.openTask); break;
+    case 'renameList': UI.renaming = true; renderTasks(); break;
+    case 'deleteList': {
+      const l = L(UI.view.slice(5)); if (!l) break;
+      const n = S.tasks.filter(t => t.list_id === l.id).length;
+      if (!confirm('Delete "' + l.name + '"' + (n ? ' and its ' + n + ' task' + (n === 1 ? '' : 's') : '') + '? This cannot be undone.')) break;
+      S.tasks = S.tasks.filter(t => t.list_id !== l.id); S.lists = S.lists.filter(x => x.id !== l.id); Store.del('lists', l.id);
+      setView('myday'); break;
+    }
+    case 'logout': Store.sb.auth.signOut(); break;
+    case 'signIn': case 'signUp': case 'setPass': authSubmit(act); break;
+    case 'forgot': sendReset(); break;
+    case 'exportData': exportData(); break;
+    case 'importData': $('#importFile').click(); break;
+    case 'showPass': { const i = $('#authPass'); const show = i.type === 'password'; i.type = show ? 'text' : 'password'; a.textContent = show ? 'Hide' : 'Show'; break; }
   }
 });
+document.addEventListener('contextmenu', e => {
+  const n = e.target.closest('.node[data-act="bubbleTask"]'); if (!n) return;
+  e.preventDefault(); UI.openTask = n.dataset.id; render();
+});
+document.addEventListener('mouseover', e => {
+  const n = e.target.closest('.node'); $$('#links .hot').forEach(l => l.classList.remove('hot'));
+  if (n) { const l = $('#links line[data-key="' + (window.CSS && CSS.escape ? CSS.escape(n.dataset.key) : n.dataset.key) + '"]'); if (l) l.classList.add('hot'); }
+});
+document.addEventListener('input', e => {
+  const el = e.target;
+  if (el.id === 'search') { UI.q = el.value.trim(); if (UI.q && UI.view === 'goals') UI.view = 'all'; UI.openTask = null; render(); $('#search').focus(); return; }
+  if (el.dataset.gfield) {
+    const g = G(UI.focus); const f = el.dataset.gfield;
+    if (f === 'title') { autosize(el); updateGoal(g, { title: el.value }, 500); renderLight(); }
+    else if (f === 'note') updateGoal(g, { note: el.value }, 600);
+    return;
+  }
+  if (el.dataset.tfield === 'title' || el.dataset.tfield === 'note') {
+    const t = T(UI.openTask); if (el.dataset.tfield === 'title') autosize(el);
+    updateTask(t, { [el.dataset.tfield]: el.value }, 500); if (el.dataset.tfield === 'title') renderLight(); return;
+  }
+  if (el.dataset.step) { const t = T(UI.openTask); const s = t.steps.find(x => x.id === el.dataset.step); s.t = el.value; updateTask(t, { steps: t.steps }, 600); return; }
+});
+document.addEventListener('change', e => {
+  const el = e.target;
+  if (el.id === 'importFile') { if (el.files[0]) importData(el.files[0]); el.value = ''; return; }
+  if (el.dataset.gfield === 'target_date') { updateGoal(G(UI.focus), { target_date: el.value || null }); return; }
+  if (el.dataset.gfield === 'measure') {
+    const g = G(UI.focus);
+    if (el.value === 'number') updateGoal(g, { metric_target: +g.metric_target > 0 ? g.metric_target : 10, metric_current: +g.metric_current || 0 });
+    else updateGoal(g, { metric_target: null });
+    render(); return;
+  }
+  if (el.dataset.gfield === 'metric_current' || el.dataset.gfield === 'metric_target') {
+    const g = G(UI.focus), v = parseFloat(el.value), patch = {};
+    if (el.dataset.gfield === 'metric_target') patch.metric_target = v > 0 ? v : g.metric_target;
+    else patch.metric_current = isNaN(v) ? 0 : Math.max(0, v);
+    updateGoal(g, patch); render(); return;
+  }
+  if (el.dataset.gfield === 'metric_unit') { updateGoal(G(UI.focus), { metric_unit: el.value.trim() || null }); render(); return; }
+  if (el.dataset.gfield === 'title' && !el.value.trim()) { el.value = 'Untitled'; updateGoal(G(UI.focus), { title: 'Untitled' }); render(); return; }
+  if (el.dataset.tfield && el.tagName !== 'TEXTAREA') {
+    const t = T(UI.openTask); const f = el.dataset.tfield; updateTask(t, { [f]: el.value || null });
+    $('#drawer').dataset.id = ''; render(); return;
+  }
+  if (el.dataset.actChange === 'sort') { UI.sorts[UI.view] = el.value; renderTasks(); return; }
+  if (el.id === 'draftDue') { UI.draft.due = el.value || null; render(); $('#addInput').focus(); return; }
+  if (el.id === 'draftGoal') { UI.draft.goal = el.value; render(); $('#addInput').focus(); return; }
+});
+document.addEventListener('keydown', e => {
+  const el = e.target;
+  if (e.key === 'Enter' && !e.shiftKey) {
+    if (el.id === 'authEmail' || el.id === 'authPass') { e.preventDefault(); authSubmit($('#authPrimary').dataset.act); return; }
+    if (el.id === 'addInput') { e.preventDefault(); addFromBar(); return; }
+    if (el.id === 'composerInput') { e.preventDefault(); composerSubmit(); return; }
+    if (el.id === 'addSheetInput') { e.preventDefault(); addSheetSubmit(); return; }
+    if (el.id === 'newList' && el.value.trim()) {
+      const l = { id: uid(), name: el.value.trim(), sort: S.lists.length + 1, created_at: nowIso() }; S.lists.push(l); Store.save('lists', l); el.value = ''; el.blur(); setView('list:' + l.id); return;
+    }
+    if (el.id === 'renameInput') { el.blur(); return; }
+    if (el.dataset.add && el.value.trim()) {
+      e.preventDefault();
+      if (el.dataset.add === 'goal') { if (!addGoal(UI.focus, el.value.trim())) toast('That is as deep as goals go. Add tasks here instead.'); } else addTask({ goal_id: UI.focus, title: el.value.trim() });
+      el.value = ''; render(); return;
+    }
+    if (el.id === 'addStep' && el.value.trim()) { const t = T(UI.openTask); updateTask(t, { steps: (t.steps || []).concat([{ id: uid(), t: el.value.trim(), done: false }]) }); el.value = ''; $('#drawer').dataset.id = ''; render(); return; }
+    if (el.matches('.ptitle,textarea[data-tfield="title"]')) { e.preventDefault(); el.blur(); return; }
+  }
+  if (e.key === 'Escape') {
+    if (el.id === 'renameInput') { UI.renaming = false; renderTasks(); return; }
+    if (UI.add) { closeAdd(); return; }
+    if (UI.composer) { UI.composer = null; removeComposer(); return; }
+    if (UI.openTask) { UI.openTask = null; render(); return; }
+    if ($('#side').classList.contains('open')) { closeSide(); return; }
+    if ($('#gpanel').classList.contains('open')) { $('#gpanel').classList.remove('open'); return; }
+    if (UI.view === 'goals' && UI.focus && !el.matches('input,textarea,select')) { setFocus(G(UI.focus).parent_id); return; }
+  }
+  if (UI.view === 'goals' && el.classList && el.classList.contains('node') && (e.key === 'ArrowRight' || e.key === 'ArrowLeft')) {
+    e.preventDefault();
+    const list = $$('#nodes .node:not(.leaving):not(.parent):not(.center)');
+    const i = list.indexOf(el); const n = list[(i + (e.key === 'ArrowRight' ? 1 : -1) + list.length) % list.length]; if (n) n.focus();
+  }
+  if (UI.view === 'goals' && e.key === 'Backspace' && UI.focus && !el.matches('input,textarea,select')) { e.preventDefault(); setFocus(G(UI.focus).parent_id); }
+});
+document.addEventListener('focusout', e => {
+  const el = e.target;
+  if (el.id === 'renameInput') {
+    const l = L(UI.view.slice(5)); if (l && el.value.trim()) { l.name = el.value.trim(); Store.save('lists', l); }
+    UI.renaming = false; setTimeout(render, 0);
+  }
+  if (el.dataset && (el.dataset.gfield === 'title' || el.dataset.tfield === 'title')) setTimeout(() => { if (!document.activeElement || !document.activeElement.dataset || !document.activeElement.dataset.gfield) render(); }, 0);
+});
+new ResizeObserver(() => { if (UI.view === 'goals') renderStage(); }).observe($('#stage'));
+
+/* =====================================================================
+   EXAMPLE DATA
+   ===================================================================== */
+function seedExample() {
+  const t0 = today();
+  const T3 = (goal, list) => list.forEach(x => addTask(Object.assign({ goal_id: goal.id, title: x[0] }, x[1] || {})));
+  const doc = addGoal(null, 'Become a doctor', { color: 'blue', note: 'Help people when it matters most.' });
+  const med = addGoal(doc.id, 'Get into med school');
+  const mcat = addGoal(med.id, 'Score 515+ on the MCAT');
+  T3(mcat, [['Book MCAT test date', { done: true, done_at: nowIso() }], ['Finish biochem content review', { due: addDays(t0, 3), my_day: t0 }], ['Full-length practice test', { repeat: 'weekly', due: addDays(t0, 4), important: true }], ['Review every missed question from last practice test', { steps: [{ id: uid(), t: 'Bio/Biochem', done: true }, { id: uid(), t: 'Chem/Phys', done: false }, { id: uid(), t: 'CARS', done: false }] }]]);
+  const clin = addGoal(med.id, 'Log 150 clinical hours');
+  T3(clin, [['Apply to hospital volunteer program', { done: true, done_at: nowIso() }], ['Email Dr. Patel about shadowing', { due: t0, my_day: t0 }]]);
+  const amcas = addGoal(med.id, 'Submit a strong AMCAS application');
+  T3(amcas, [['Draft personal statement'], ['Ask for 3 recommendation letters', { due: addDays(t0, 14) }]]);
+  const usmle = addGoal(doc.id, 'Pass the USMLE');
+  const s1 = addGoal(usmle.id, 'Pass Step 1'); T3(s1, [['Build a dedicated study schedule']]);
+  addGoal(usmle.id, 'Score 250+ on Step 2 CK');
+  const res = addGoal(doc.id, 'Match into residency');
+  addGoal(res.id, 'Rank list of 10 programs'); addGoal(res.id, 'Crush audition rotations');
+  const fit = addGoal(null, 'Get strong', { color: 'teal' });
+  const bench = addGoal(fit.id, 'Bench 225'); const prog4 = addGoal(bench.id, 'Train 4x a week for 12 weeks', { metric_current: 9, metric_target: 48, metric_unit: 'sessions' });
+  T3(prog4, [['Upper body session', { repeat: 'weekdays', due: t0, my_day: t0 }], ['Buy lifting belt', { done: true, done_at: nowIso() }]]);
+  const half = addGoal(fit.id, 'Run a half marathon'); addGoal(half.id, 'Run 20 miles a week');
+  const money = addGoal(null, 'Financial freedom', { color: 'amber' });
+  const ef = addGoal(money.id, 'Six month emergency fund'); const auto = addGoal(ef.id, 'Automate savings every payday');
+  T3(auto, [['Set up automatic transfer', { important: true, due: addDays(t0, -1) }]]);
+  const errands = { id: uid(), name: 'Errands', sort: 1, created_at: nowIso() }; S.lists.push(errands); Store.save('lists', errands);
+  addTask({ title: 'Renew car registration', list_id: errands.id, due: t0 });
+  addTask({ title: 'Pick up dry cleaning', list_id: errands.id });
+  addTask({ title: 'Call the dentist', important: true });
+}
+
+/* =====================================================================
+   BOOT (auto-detect preview vs live GitHub Pages)
+   ===================================================================== */
+function startApp() { hydrateIcons(document); render(); }
+let started = false;
+async function startLive() {
+  $('#auth').classList.remove('on'); $('#logoutBtn').hidden = false; setSync('saving');
+  try { await Store.loadRemote(); setSync('ok'); } catch (err) { setSync('error', err.message); }
+  startApp();
+}
+function authMsg(text, info) { const e = $('#authErr'); e.textContent = text || ''; e.classList.toggle('info', !!info); }
+function showAuth(mode) {
+  $('#auth').classList.add('on'); $('#logoutBtn').hidden = true; S = { goals: [], lists: [], tasks: [] };
+  const rec = mode === 'recover';
+  $('#authEmail').hidden = rec; $('#authSecondary').hidden = rec; $('#authForgot').hidden = rec;
+  $('#authPass').placeholder = rec ? 'New password (6+ characters)' : 'Password';
+  $('#authPass').autocomplete = rec ? 'new-password' : 'current-password';
+  $('#authPrimary').dataset.act = rec ? 'setPass' : 'signIn';
+  $('#authPrimary').textContent = rec ? 'Save new password' : 'Sign in';
+  authMsg(rec ? 'Choose a new password to finish resetting.' : '', rec);
+  (rec ? $('#authPass') : $('#authEmail')).focus();
+}
+async function authSubmit(kind) {
+  const email = $('#authEmail').value.trim(), password = $('#authPass').value; authMsg('');
+  const btn = $('#authPrimary');
+  if (kind === 'setPass') {
+    if (password.length < 6) { authMsg('Use at least 6 characters.'); return; }
+    btn.disabled = true; const r = await Store.sb.auth.updateUser({ password: password }); btn.disabled = false;
+    if (r.error) { authMsg(r.error.message); return; }
+    Store.recovering = false; history.replaceState(null, '', location.pathname);
+    Store.user = r.data.user; startLive(); return;
+  }
+  if (!email || !password) { authMsg('Enter your email and password.'); return; }
+  btn.disabled = true;
+  const res = kind === 'signUp' ? await Store.sb.auth.signUp({ email: email, password: password, options: { emailRedirectTo: location.origin + location.pathname } })
+                                : await Store.sb.auth.signInWithPassword({ email: email, password: password });
+  btn.disabled = false;
+  if (res.error) { authMsg(res.error.message); return; }
+  if (!res.data.session) { authMsg('Account created. Check your email to confirm, then sign in.', true); return; }
+  Store.user = res.data.session.user; startLive();
+}
+function exportData() {
+  const data = { app: 'orbit', version: 1, exported_at: nowIso(), goals: S.goals, lists: S.lists, tasks: S.tasks };
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'orbit-backup-' + today() + '.json';
+  document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  toast('Backup downloaded: ' + S.goals.length + ' goals, ' + S.tasks.length + ' tasks');
+}
+async function importData(file) {
+  let d;
+  try { d = JSON.parse(await file.text()); } catch (e) { toast('That file is not an Orbit backup'); return; }
+  if (!d || d.app !== 'orbit' || !Array.isArray(d.goals) || !Array.isArray(d.tasks)) { toast('That file is not an Orbit backup'); return; }
+  const lists = d.lists || [];
+  if (!confirm('Restore ' + d.goals.length + ' goals, ' + lists.length + ' lists and ' + d.tasks.length + ' tasks from ' + (d.exported_at || 'this backup').slice(0, 10) + '?\n\nItems already in your account stay. Items in the backup are added back or restored to their backed up version.')) return;
+  const merge = (arr, rows, table) => rows.forEach(r => { const i = arr.findIndex(x => x.id === r.id); if (i >= 0) arr[i] = r; else arr.push(r); Store.save(table, r); });
+  merge(S.lists, lists, 'lists');
+  merge(S.goals, d.goals.slice().sort((a, b) => a.tier - b.tier), 'goals');
+  merge(S.tasks, d.tasks.map(t => Object.assign({ steps: [] }, t)), 'tasks');
+  Store.persistLocal(); render(); toast('Backup restored');
+}
+async function sendReset() {
+  const email = $('#authEmail').value.trim();
+  if (!email) { authMsg('Enter your email first, then tap Forgot password.'); return; }
+  const r = await Store.sb.auth.resetPasswordForEmail(email, { redirectTo: location.origin + location.pathname });
+  authMsg(r.error ? r.error.message : 'Reset link sent. Open it on this device to set a new password.', !r.error);
+}
+(async function boot() {
+  const configured = /^https:\/\//.test(SUPABASE_URL) && SUPABASE_ANON_KEY.indexOf('YOUR_') !== 0 && SUPABASE_ANON_KEY.indexOf('PASTE') !== 0;
+  const live = configured && /github\.io$/.test(location.hostname) && window.supabase;
+  if (live) {
+    Store.live = true; Store.sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    hydrateIcons(document);
+    Store.recovering = /type=recovery/.test(location.hash);
+    Store.sb.auth.onAuthStateChange((ev) => {
+      if (ev === 'SIGNED_OUT') showAuth();
+      if (ev === 'PASSWORD_RECOVERY') { Store.recovering = true; showAuth('recover'); }
+    });
+    const { data } = await Store.sb.auth.getSession();
+    if (Store.recovering) showAuth('recover');
+    else if (data.session) { Store.user = data.session.user; startLive(); }
+    else showAuth();
+  } else {
+    const had = Store.loadLocal();
+    if (!had) seedExample();
+    Store.persistLocal(); setSync('local'); startApp();
+  }
+})();
+</script>
+</body>
+</html>
